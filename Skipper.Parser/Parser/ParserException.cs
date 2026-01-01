@@ -2,10 +2,6 @@
 
 namespace Skipper.Parser.Parser;
 
-/// <summary>
-/// Исключение, используемое для прерывания процесса парсинга при обнаружении синтаксической ошибки. 
-/// Позволяет механизму "Panic Mode" перехватить управление и синхронизировать состояние парсера
-/// </summary>
 public class ParserException : Exception
 {
     /// <summary>

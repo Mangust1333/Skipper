@@ -41,17 +41,14 @@ public class DeclarationTests
         Assert.Equal("Point", cls.Name);
         Assert.Equal(3, cls.Members.Count);
 
-        // Поле x
         var fieldX = Assert.IsType<VariableDeclaration>(cls.Members[0]);
         Assert.Equal("x", fieldX.Name);
         Assert.True(fieldX.IsPublic);
 
-        // Поле y
         var fieldY = Assert.IsType<VariableDeclaration>(cls.Members[1]);
         Assert.Equal("y", fieldY.Name);
-        Assert.False(fieldY.IsPublic); // по умолчанию false, если не указано
+        Assert.False(fieldY.IsPublic);
 
-        // Метод print
         var method = Assert.IsType<FunctionDeclaration>(cls.Members[2]);
         Assert.Equal("print", method.Name);
     }

@@ -2,6 +2,9 @@
 
 namespace Skipper.Parser.Parser;
 
+/// <summary>
+/// Диагностическое сообщение парсера
+/// </summary>
 public class ParserDiagnostic
 {
     public ParserDiagnosticLevel Level { get; }
