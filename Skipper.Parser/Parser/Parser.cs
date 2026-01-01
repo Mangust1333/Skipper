@@ -248,11 +248,8 @@ public sealed class Parser
             return ParseForStatement();
         if (Match(TokenType.KEYWORD_RETURN))
             return ParseReturnStatement();
-        if (Check(TokenType.BRACE_OPEN))
-        {
-            Consume(TokenType.BRACE_OPEN, "Expected '{'.");
+        if (Match(TokenType.BRACE_OPEN))
             return ParseBlock();
-        }
 
         if (IsTypeStart(Current))
         {
@@ -551,21 +548,22 @@ public sealed class Parser
     private Expression ParsePrimary()
     {
         if (Match(TokenType.KEYWORD_NEW))
+        {
             return ParseNewExpression();
+        }
 
-        // Исправление: добавили BOOL_LITERAL и правильную обработку значений
-        if (Match(TokenType.NUMBER, TokenType.FLOAT_LITERAL, TokenType.STRING_LITERAL, TokenType.CHAR_LITERAL,
+        if (Match(TokenType.NUMBER,
+                TokenType.FLOAT_LITERAL,
+                TokenType.STRING_LITERAL,
+                TokenType.CHAR_LITERAL,
                 TokenType.BOOL_LITERAL))
         {
             var token = Previous;
-            if (token.Type == TokenType.NUMBER)
-                return new LiteralExpression(token.GetNumericValue(), token);
-            if (token.Type == TokenType.FLOAT_LITERAL)
+            if (token.Type is TokenType.NUMBER or TokenType.FLOAT_LITERAL)
                 return new LiteralExpression(token.GetNumericValue(), token);
             if (token.Type == TokenType.BOOL_LITERAL)
                 return new LiteralExpression(token.GetBoolValue(), token);
 
-            // Строки и символы
             return new LiteralExpression(token.Type == TokenType.STRING_LITERAL ? token.GetStringValue() : token.Text,
                 token);
         }
@@ -587,7 +585,7 @@ public sealed class Parser
 
     private Expression ParseNewExpression()
     {
-        var type = ParseType(); // Съедает "int" или имя типа
+        var type = ParseType();
 
         if (Match(TokenType.BRACKET_OPEN))
         {
