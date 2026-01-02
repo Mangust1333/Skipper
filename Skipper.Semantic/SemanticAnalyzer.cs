@@ -1,5 +1,3 @@
-using System.Collections.Concurrent;
-using System.Reflection;
 using Skipper.Lexer.Tokens;
 using Skipper.Parser.AST;
 using Skipper.Parser.AST.Declarations;
@@ -162,6 +160,13 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
 
         node.Body.Accept(this);
 
+        if (_currentReturnType != BuiltinTypeSymbol.Void && !StatementAlwaysReturns(node.Body))
+        {
+            ReportError(
+                $"Not all code paths return a value for function '{node.Name}' returning '{_currentReturnType}'",
+                node.Token);
+        }
+
         ExitScope();
         _currentReturnType = oldReturn;
 
@@ -283,6 +288,13 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
             }
 
             m.Body.Accept(this);
+
+            if (methodSym.Type != BuiltinTypeSymbol.Void && !StatementAlwaysReturns(m.Body))
+            {
+                ReportError($"Not all code paths return a value for method '{m.Name}' returning '{methodSym.Type}'",
+                    m.Token);
+            }
+
             ExitScope();
 
             _currentReturnType = oldReturn;
@@ -315,6 +327,34 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
 
         ExitScope();
         return BuiltinTypeSymbol.Void;
+    }
+
+    private static bool StatementAlwaysReturns(Statement stmt)
+    {
+        while (true)
+        {
+            if (stmt.NodeType == AstNodeType.ReturnStatement)
+            {
+                return true;
+            }
+
+            if (stmt.NodeType == AstNodeType.BlockStatement)
+            {
+                var bs = (BlockStatement)stmt;
+                if (bs.Statements.Count == 0) return false;
+                stmt = bs.Statements[^1];
+                continue;
+            }
+
+            if (stmt.NodeType == AstNodeType.IfStatement)
+            {
+                var ifs = (IfStatement)stmt;
+                if (ifs.ElseBranch == null) return false;
+                return StatementAlwaysReturns(ifs.ThenBranch) && StatementAlwaysReturns(ifs.ElseBranch);
+            }
+
+            return false;
+        }
     }
 
     public TypeSymbol VisitIfStatement(IfStatement node)

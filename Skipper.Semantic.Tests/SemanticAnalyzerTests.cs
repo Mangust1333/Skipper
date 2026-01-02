@@ -367,6 +367,38 @@ public class SemanticTests
     }
 
     [Fact]
+    public void Function_Missing_Return_Error()
+    {
+        // Arrange
+        const string code = """
+                            class A { int x; }
+                            fn func() -> int {
+                             A a;
+                             int y = a.x;
+                            }
+                            """;
+
+        // Act
+        var semantic = SemanticTestHelper.Analyze(code);
+
+        // Assert
+        Assert.Contains(semantic.Diagnostics, d => d.Message.Contains("Not all code paths return"));
+    }
+
+    [Fact]
+    public void Method_Missing_Return_Error()
+    {
+        // Arrange
+        const string code = "class A { int x; fn public m() -> int { int y = x; } }";
+
+        // Act
+        var semantic = SemanticTestHelper.Analyze(code);
+
+        // Assert
+        Assert.Contains(semantic.Diagnostics, d => d.Message.Contains("Not all code paths return"));
+    }
+
+    [Fact]
     public void Assign_To_Member_And_Array_Element_Type_Checks()
     {
         // Arrange
