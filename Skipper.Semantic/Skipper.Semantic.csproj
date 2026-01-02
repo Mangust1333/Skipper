@@ -6,4 +6,8 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\Skipper.Parser\Skipper.Parser.csproj" />
+    </ItemGroup>
+
 </Project>
