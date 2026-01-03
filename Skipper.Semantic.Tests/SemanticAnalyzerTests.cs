@@ -228,7 +228,7 @@ public class SemanticTests
         var semantic = SemanticTestHelper.Analyze(code);
 
         // Assert
-        Assert.Contains(semantic.Diagnostics, d => d.Message.Contains("expects"));
+        Assert.Contains(semantic.Diagnostics, d => d.Message.Contains("Expected"));
         Assert.Contains(semantic.Diagnostics, d => d.Message.Contains("Cannot convert argument"));
     }
 

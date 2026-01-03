@@ -23,20 +23,50 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
 
     private void ReportError(string message, Token? token = null)
     {
-        _diagnostics.Add(new SemanticDiagnostic(
-            SemanticDiagnosticLevel.Error,
-            message,
-            token));
+        _diagnostics.Add(new SemanticDiagnostic(SemanticDiagnosticLevel.Error, message, token));
     }
 
-    private void EnterScope()
+    private void EnterScope() => _currentScope = new Scope(_currentScope);
+
+    private void ExitScope() => _currentScope = _currentScope.Parent ?? _currentScope;
+
+    private static readonly Dictionary<string, BuiltinTypeSymbol> SBuiltinTypes = new()
     {
-        _currentScope = new Scope(_currentScope);
+        ["int"] = BuiltinTypeSymbol.Int,
+        ["float"] = BuiltinTypeSymbol.Float,
+        ["bool"] = BuiltinTypeSymbol.Bool,
+        ["char"] = BuiltinTypeSymbol.Char,
+        ["string"] = BuiltinTypeSymbol.String,
+        ["void"] = BuiltinTypeSymbol.Void,
+    };
+
+    private bool TryDeclare(Symbol symbol, Token? token, string errorMessage)
+    {
+        if (_currentScope.Declare(symbol))
+        {
+            return true;
+        }
+
+        ReportError(errorMessage, token);
+        return false;
     }
 
-    private void ExitScope()
+    private void ValidateArguments(IReadOnlyList<ParameterSymbol> parameters, IReadOnlyList<Expression> arguments, Token? tokenForError)
     {
-        _currentScope = _currentScope.Parent ?? _currentScope;
+        if (parameters.Count != arguments.Count)
+        {
+            ReportError($"Expected {parameters.Count} arguments, got {arguments.Count}", tokenForError);
+        }
+
+        for (var i = 0; i < Math.Min(parameters.Count, arguments.Count); i++)
+        {
+            var at = arguments[i].Accept(this);
+            var pt = parameters[i].Type;
+            if (!TypeSystem.AreAssignable(at, pt))
+            {
+                ReportError($"Cannot convert argument {i} from '{at}' to '{pt}'", arguments[i].Token);
+            }
+        }
     }
 
     private TypeSymbol ResolveTypeByName(string name, Token? token = null)
@@ -48,16 +78,17 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
             return TypeFactory.Array(element);
         }
 
-        return name switch
+        if (SBuiltinTypes.TryGetValue(name, out var bt))
         {
-            "int" => BuiltinTypeSymbol.Int,
-            "float" => BuiltinTypeSymbol.Float,
-            "bool" => BuiltinTypeSymbol.Bool,
-            "char" => BuiltinTypeSymbol.Char,
-            "string" => BuiltinTypeSymbol.String,
-            "void" => BuiltinTypeSymbol.Void,
-            _ => _classes.TryGetValue(name, out var cls) ? cls : ReportUnknownType(name, token)
-        };
+            return bt;
+        }
+
+        if (_classes.TryGetValue(name, out var cls))
+        {
+            return cls;
+        }
+
+        return ReportUnknownType(name, token);
     }
 
     private BuiltinTypeSymbol ReportUnknownType(string name, Token? token)
@@ -108,20 +139,14 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
                 }
 
                 var function = new FunctionSymbol(fn.Name, returnType, parameters);
-                if (!_currentScope.Declare(function))
-                {
-                    ReportError($"Function '{fn.Name}' already declared in scope", fn.Token);
-                }
+                TryDeclare(function, fn.Token, $"Function '{fn.Name}' already declared in scope");
             }
             else if (decl.NodeType == AstNodeType.VariableDeclaration)
             {
                 var v = (VariableDeclaration)decl;
                 var t = ResolveTypeByName(v.TypeName, v.Token);
                 var variable = new VariableSymbol(v.Name, t);
-                if (!_currentScope.Declare(variable))
-                {
-                    ReportError($"Variable '{v.Name}' already declared in this scope", v.Token);
-                }
+                TryDeclare(variable, v.Token, $"Variable '{v.Name}' already declared in this scope");
             }
         }
 
@@ -152,10 +177,7 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
 
             var pt = ResolveTypeByName(p.TypeName, p.Token);
             var psym = new ParameterSymbol(p.Name, pt);
-            if (!_currentScope.Declare(psym))
-            {
-                ReportError($"Parameter '{p.Name}' already declared", p.Token);
-            }
+            TryDeclare(psym, p.Token, $"Parameter '{p.Name}' already declared");
         }
 
         node.Body.Accept(this);
@@ -202,10 +224,7 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
         }
 
         var variable = new VariableSymbol(node.Name, type);
-        if (!_currentScope.Declare(variable))
-        {
-            ReportError($"Variable '{node.Name}' already declared in this scope", node.Token);
-        }
+        TryDeclare(variable, node.Token, $"Variable '{node.Name}' already declared in this scope");
 
         return type;
     }
@@ -281,10 +300,7 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
             foreach (var p in m.Parameters)
             {
                 var pt = ResolveTypeByName(p.TypeName, p.Token);
-                if (!_currentScope.Declare(new ParameterSymbol(p.Name, pt)))
-                {
-                    ReportError($"Parameter '{p.Name}' already declared", p.Token);
-                }
+                TryDeclare(new ParameterSymbol(p.Name, pt), p.Token, $"Parameter '{p.Name}' already declared");
             }
 
             m.Body.Accept(this);
@@ -309,10 +325,7 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
     {
         var t = ResolveTypeByName(node.TypeName, node.Token);
         var sym = new ParameterSymbol(node.Name, t);
-        if (!_currentScope.Declare(sym))
-        {
-            ReportError($"Parameter '{node.Name}' already declared", node.Token);
-        }
+        TryDeclare(sym, node.Token, $"Parameter '{node.Name}' already declared");
 
         return t;
     }
@@ -618,23 +631,7 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
             var sym = _currentScope.Resolve(id.Name);
             if (sym is FunctionSymbol fs)
             {
-                if (fs.Parameters.Count != node.Arguments.Count)
-                {
-                    ReportError(
-                        $"Function '{fs.Name}' expects {fs.Parameters.Count} arguments, got {node.Arguments.Count}",
-                        id.Token);
-                }
-
-                for (var i = 0; i < Math.Min(fs.Parameters.Count, node.Arguments.Count); i++)
-                {
-                    var at = node.Arguments[i].Accept(this);
-                    var pt = fs.Parameters[i].Type;
-                    if (!TypeSystem.AreAssignable(at, pt))
-                    {
-                        ReportError($"Cannot convert argument {i} from '{at}' to '{pt}'", node.Arguments[i].Token);
-                    }
-                }
-
+                ValidateArguments(fs.Parameters, node.Arguments, id.Token);
                 return fs.Type;
             }
 
@@ -653,23 +650,7 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
                     return BuiltinTypeSymbol.Void;
                 }
 
-                if (method.Parameters.Count != node.Arguments.Count)
-                {
-                    ReportError(
-                        $"Method '{method.Name}' expects {method.Parameters.Count} arguments, got {node.Arguments.Count}",
-                        mae.Object.Token);
-                }
-
-                for (var i = 0; i < Math.Min(method.Parameters.Count, node.Arguments.Count); i++)
-                {
-                    var at = node.Arguments[i].Accept(this);
-                    var pt = method.Parameters[i].Type;
-                    if (!TypeSystem.AreAssignable(at, pt))
-                    {
-                        ReportError($"Cannot convert argument {i} from '{at}' to '{pt}'", node.Arguments[i].Token);
-                    }
-                }
-
+                ValidateArguments(method.Parameters, node.Arguments, mae.Object.Token);
                 return method.Type;
             }
 
