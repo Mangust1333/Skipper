@@ -83,7 +83,7 @@ public class LexerTests
 
         // Act & Assert
         var ex = Assert.Throws<LexerException>(() => lexer.Tokenize());
-        Assert.Contains("Ожидалась цифра после точки в числе", ex.Message);
+        Assert.Contains("Expected digit after decimal point in number", ex.Message);
     }
 
     [Theory]
@@ -99,7 +99,7 @@ public class LexerTests
 
         // Act & Assert
         var ex = Assert.Throws<LexerException>(() => lexer.Tokenize());
-        Assert.Contains("Ожидалась цифра в экспоненте", ex.Message);
+        Assert.Contains("Expected digit in exponent", ex.Message);
     }
 
     [Theory]
@@ -471,6 +471,6 @@ public class LexerTests
 
         var error = result.Diagnostics[0];
         Assert.Equal(LexerDiagnosticLevel.Error, error.Level);
-        Assert.Contains("Неизвестный символ", error.Message);
+        Assert.Contains("Unknown character", error.Message);
     }
 }

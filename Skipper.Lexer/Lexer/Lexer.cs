@@ -97,7 +97,7 @@ public sealed class Lexer
                     {
                         diagnostics.Add(new LexerDiagnostic(
                             LexerDiagnosticLevel.Error,
-                            $"Неизвестный символ '{token.Text}'",
+                            $"Unknown character '{token.Text}'",
                             token.Line,
                             token.Column
                         ));
@@ -137,7 +137,7 @@ public sealed class Lexer
     }
 
     /// <summary>
-    ///  Текущий символ в позиции курсора
+    /// Текущий символ в позиции курсора
     /// </summary>
     private char Current => _position < _source.Length ? _source[_position] : '\0';
 
@@ -234,7 +234,7 @@ public sealed class Lexer
             Advance();
         }
 
-        throw new LexerException("Незакрытый блочный комментарий", _line, _column);
+        throw new LexerException("Unterminated block comment", _line, _column);
     }
 
     /// <summary>
@@ -291,7 +291,7 @@ public sealed class Lexer
 
             if (!char.IsDigit(Current))
             {
-                throw new LexerException("Ожидалась цифра после точки в числе", _line, _column);
+                throw new LexerException("Expected digit after decimal point in number", _line, _column);
             }
 
             while (char.IsDigit(Current))
@@ -315,7 +315,7 @@ public sealed class Lexer
 
             if (!char.IsDigit(Current))
             {
-                throw new LexerException("Ожидалась цифра в экспоненте", _line, _column);
+                throw new LexerException("Expected digit in exponent", _line, _column);
             }
 
             while (char.IsDigit(Current))
@@ -359,7 +359,7 @@ public sealed class Lexer
 
         if (Current != quoteChar)
         {
-            throw new LexerException("Незакрытый строковый литерал", startLine, startColumn);
+            throw new LexerException("Unterminated string literal", startLine, startColumn);
         }
 
         Advance();
@@ -368,7 +368,7 @@ public sealed class Lexer
 
         if (isCharLiteral && content.Length != 1)
         {
-            throw new LexerException($"Недопустимый символьный литерал: '{content}'", startLine, startColumn);
+            throw new LexerException($"Invalid character literal: '{content}'", startLine, startColumn);
         }
 
         var text = quoteChar + content + quoteChar;
@@ -385,7 +385,7 @@ public sealed class Lexer
         Advance(); // \
         if (Current == '\0')
         {
-            throw new LexerException("Незавершенная escape-последовательность", _line, _column);
+            throw new LexerException("Unterminated escape sequence", _line, _column);
         }
 
         var result = Current switch
@@ -397,7 +397,7 @@ public sealed class Lexer
             '\'' => '\'',
             '"' => '"',
             '0' => '\0',
-            _ => throw new LexerException($"Неизвестная escape-последовательность: \\{Current}", _line, _column)
+            _ => throw new LexerException($"Unknown escape sequence: \\{Current}", _line, _column)
         };
 
         Advance();
@@ -471,13 +471,13 @@ public sealed class Lexer
             case '&':
                 Advance();
                 if (!Match('&'))
-                    throw new LexerException("Ожидался '&'", _line, _column);
+                    throw new LexerException("Expected '&' for '&&' operator", _line, _column);
                 return new Token(TokenType.AND, "&&", startPos, startLine, startColumn);
 
             case '|':
                 Advance();
                 if (!Match('|'))
-                    throw new LexerException("Ожидался '|'", _line, _column);
+                    throw new LexerException("Expected '|' for '||' operator", _line, _column);
                 return new Token(TokenType.OR, "||", startPos, startLine, startColumn);
 
             case '-':
