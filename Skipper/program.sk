@@ -4,5 +4,13 @@ class A {
 }
 
 fn func() -> int {
-    true || false;  return 1;
+    A a;
+    int b = 2;
+    for (int i = 0; i < 3; i = i + 1) {
+        b = b + 1;
+        if (b > 6) {
+            return 4;
+        }
+    }
+    return 1;
 }
