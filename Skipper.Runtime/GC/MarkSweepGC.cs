@@ -51,22 +51,16 @@ public sealed class MarkSweepGc : IGarbageCollector
 
     private void Sweep()
     {
-        var dead = new List<HeapObject>();
-
-        foreach (var obj in _heap.Objects)
+        for (var i = _heap.Objects.Count - 1; i >= 0; i--)
         {
-            if (!obj.Marked)
-            {
-                dead.Add(obj);
-            }
-            else
+            var obj = _heap.Objects[i];
+
+            if (obj.Marked)
             {
                 obj.Marked = false;
+                continue;
             }
-        }
 
-        foreach (var obj in dead)
-        {
             _heap.Free(obj);
         }
     }
