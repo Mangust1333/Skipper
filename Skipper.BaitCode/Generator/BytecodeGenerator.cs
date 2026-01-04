@@ -192,13 +192,8 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         // Присваивание
         if (node.Operator.Type == TokenType.ASSIGN)
         {
-            // 1. вычисляем r-value
             node.Right.Accept(this);
-
-            // 2. дублируем, т.к. assignment — expression
             Emit(OpCode.DUP);
-
-            // 3. сохраняем в l-value
             EmitStore(node.Left);
 
             return this;
@@ -232,10 +227,9 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
     
     private void EmitStore(Expression target)
     {
-        target.Accept(this);
-        
         switch (target)
         {
+            // x = value
             case IdentifierExpression id:
             {
                 var slot = Locals.Resolve(id.Name);
@@ -243,24 +237,45 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
                 break;
             }
 
-            case ArrayAccessExpression arr:
+            // obj.field = value
+            case MemberAccessExpression ma:
             {
-                arr.Target.Accept(this);
-                arr.Index.Accept(this);
+                // stack: value
+                // нужно: object, value
+
+                // вычисляем объект
+                ma.Object.Accept(this);
+
+                // stack: value, object
+                Emit(OpCode.SWAP);
+                // stack: object, value
+
+                var field = ResolveField(ma);
+                Emit(OpCode.SET_FIELD, field.FieldId);
+                break;
+            }
+
+            // arr[index] = value
+            case ArrayAccessExpression aa:
+            {
+                // stack: value
+
+                aa.Target.Accept(this); // array
+                aa.Index.Accept(this);  // index
+
+                // stack: value, array, index
+                Emit(OpCode.SWAP);      // value <-> index
+                // stack: index, array, value
+                Emit(OpCode.SWAP);      // index <-> array
+                // stack: array, index, value
+
                 Emit(OpCode.SET_ELEMENT);
                 break;
             }
 
-            case MemberAccessExpression mem:
-            {
-                mem.Object.Accept(this);
-                var fieldId = ResolveField(mem);
-                Emit(OpCode.SET_FIELD, fieldId);
-                break;
-            }
-
             default:
-                throw new InvalidOperationException("Invalid assignment target");
+                throw new InvalidOperationException(
+                    $"Expression '{target.NodeType}' cannot be assigned to");
         }
     }
 
@@ -322,6 +337,8 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
+    
+    
     // Разрешение типа
     private BytecodeType ResolveType(string typeName)
     {

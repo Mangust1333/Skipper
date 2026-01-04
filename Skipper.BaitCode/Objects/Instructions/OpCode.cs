@@ -31,12 +31,6 @@ public enum OpCode
     OR,          // a b -> (a || b)
     NOT,         // a -> (!a)
     
-    // Преобразования типов
-    TO_INT,
-    TO_FLOAT,
-    TO_BOOL,
-    TO_STRING,
-    
     // Управление
     JUMP,        // [offset]
     JUMP_IF_TRUE,// [offset]
