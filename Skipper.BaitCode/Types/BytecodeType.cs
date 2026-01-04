@@ -1,13 +1,6 @@
 ﻿namespace Skipper.BaitCode.Types;
 
-public enum BytecodeType
+public abstract class BytecodeType
 {
-    VOID,
-    INT,
-    FLOAT,
-    BOOL,
-    CHAR,
-    STRING,
-    ARRAY,
-    CLASS,
+    public int TypeId { get; internal set; }
 }

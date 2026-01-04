@@ -1,4 +1,6 @@
-﻿public enum OpCode
+﻿namespace Skipper.BaitCode.Objects.Instructions;
+
+public enum OpCode
 {
     // stack
     PUSH_CONST,

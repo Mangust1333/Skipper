@@ -1,4 +1,5 @@
-﻿using Skipper.BaitCode.Types;
+﻿using Skipper.BaitCode.Objects.Instructions;
+using Skipper.BaitCode.Types;
 
 namespace Skipper.BaitCode.Objects;
 
@@ -6,7 +7,7 @@ public class BytecodeFunction(
     int id,
     string name,
     BytecodeType returnType,
-    List<BytecodeType> parameterTypes)
+    List<(string Names, BytecodeType Type)> parameters)
 {
     // Id, также может содержаться и в классах
     public int FunctionId { get; set; } = id;
@@ -15,7 +16,7 @@ public class BytecodeFunction(
 
     // Сигнатура
     public BytecodeType ReturnType { get; set; } = returnType;
-    public List<BytecodeType> ParameterTypes { get; set; } = parameterTypes;
+    public List<(string Names, BytecodeType Type)> ParameterTypes { get; set; } = parameters;
 
     // Конкретные инструкции
     public List<Instruction> Code { get; set; } = [];

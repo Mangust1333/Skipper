@@ -6,6 +6,8 @@ using Skipper.Parser.AST.Statements;
 using Skipper.Parser.Visitor;
 using Skipper.BaitCode.IdManager;
 using Skipper.BaitCode.Objects;
+using Skipper.BaitCode.Objects.Instructions;
+using Skipper.BaitCode.Types;
 
 namespace Skipper.BaitCode.Generator;
 
@@ -15,41 +17,26 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
 
     private BytecodeFunction? _currentFunction;
     private readonly Stack<LocalSlotManager> _locals = new();
+    private readonly Dictionary<string, BytecodeType> _resolvedTypes = new();
+    private readonly Dictionary<string, PrimitiveType> _primitiveTypes = new();
 
-    // ---------- ENTRY ----------
     public BytecodeProgram Generate(ProgramNode program)
     {
-        // ПРОХОД 1: регистрация
-        RegisterDeclarations(program);
-
-        // ПРОХОД 2: код
-        program.Accept(this);
+        VisitProgram(program);
 
         return _program;
     }
 
-    // ---------- PASS 1 ----------
-    private void RegisterDeclarations(ProgramNode program)
+    // Добавляет операцию в текущую обрабатываемую функцию
+    private void Emit(OpCode opCode, params object[] operands)
     {
-        foreach (var decl in program.Declarations)
-        {
-            if (decl is FunctionDeclaration fn)
-            {
-                _program.RegisterFunction(fn.Name);
-            }
-            else if (decl is ClassDeclaration cls)
-            {
-                _program.RegisterClass(cls.Name);
-            }
-        }
+        if (_currentFunction == null)
+            throw new InvalidOperationException("No function declared in scope");
+
+        _currentFunction.Code.Add(new Instruction(opCode, operands));
     }
 
-    private void Emit(OpCode opCode, int operand = 0)
-    {
-        _currentFunction.Code.Add(new Instruction(opCode, operand));
-    }
-
-    // --- Root ---
+    // Обход начиная с результата работы парсера AST (корневой узел)
     public BytecodeGenerator VisitProgram(ProgramNode node)
     {
         foreach (var decl in node.Declarations)
@@ -59,92 +46,74 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
+    private LocalSlotManager Locals => _locals.Peek();
+    private void EnterScope() => Locals.EnterScope();
+    private void ExitScope() => Locals.ExitScope();
+
     // --- Declarations ---
     public BytecodeGenerator VisitFunctionDeclaration(FunctionDeclaration node)
     {
-        _locals.Reset();
-        _currentFunction = new BytecodeFunction(node.Name);
-        _program.Functions.Add(_currentFunction);
-
-        // Регистрируем параметры в слотах
+        var function = new BytecodeFunction(
+            id: _program.Functions.Count,
+            name: node.Name,
+            returnType: ResolveType(node.ReturnType),
+            parameters: node.Parameters
+                .Select(p => (p.Name, ResolveType(p.TypeName)))
+                .ToList()
+        );
+        
+        _program.Functions.Add(function);
+        _currentFunction = function;
+        
+        _locals.Push(new LocalSlotManager());
+        EnterScope();
+        
         foreach (var param in node.Parameters)
-        {
             param.Accept(this);
-        }
 
         node.Body.Accept(this);
 
-        Emit(OpCode.RETURN);
+        ExitScope();
+        _locals.Pop();
+
+        _currentFunction = null;
+
         return this;
     }
 
     public BytecodeGenerator VisitParameterDeclaration(ParameterDeclaration node)
     {
-        _locals.Declare(node.Name);
+        Locals.Declare(node.Name);
         return this;
     }
 
-    public BytecodeGenerator VisitVariableDeclaration(VariableDeclaration node)
+    public BytecodeGenerator VisitVariableDeclaration(VariableDeclaration node) // TODO: посмотреть на ResolveType
     {
-        int slot = _locals.Declare(node.Name);
+        var slot = Locals.Declare(node.Name);
+
         if (node.Initializer != null)
         {
             node.Initializer.Accept(this);
             Emit(OpCode.STORE_LOCAL, slot);
         }
+
         return this;
     }
 
-    public BytecodeGenerator VisitClassDeclaration(ClassDeclaration node)
+    public BytecodeGenerator VisitClassDeclaration(ClassDeclaration node) // TODO
     {
-        var classNameIndex = _program.ConstantPool.IndexOf(node.Name);
-        if (classNameIndex < 0)
-        {
-            classNameIndex = _program.ConstantPool.Count;
-            _program.ConstantPool.Add(node.Name);
-        }
-
-        var bytecodeClass = new BytecodeClass(node.Name, classNameIndex);
-
-        foreach (var member in node.Members)
-        {
-            switch (member)
-            {
-                case VariableDeclaration field:
-                {
-                    var fieldSlot = bytecodeClass.Fields.Count;
-                    bytecodeClass.Fields.Add(field.Name, fieldSlot);
-                    break;
-                }
-
-                case FunctionDeclaration method:
-                {
-                    var methodId = _program.Functions.Count;
-
-                    bytecodeClass.Methods.Add(method.Name, methodId);
-
-                    VisitFunctionDeclaration(method);
-                    break;
-                }
-
-                default:
-                    throw new NotSupportedException(
-                        $"Член класса не поддерживается: {member.GetType().Name}");
-            }
-        }
-
-        _program.Classes.Add(bytecodeClass);
-
         return this;
     }
 
     // --- Statements ---
     public BytecodeGenerator VisitBlockStatement(BlockStatement node)
     {
+        EnterScope();
+
         foreach (var stmt in node.Statements)
-        {
             stmt.Accept(this);
-        }
+
+        ExitScope();
         return this;
     }
 
@@ -157,33 +126,42 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
 
     public BytecodeGenerator VisitReturnStatement(ReturnStatement node)
     {
-        if (node.Value != null)
-        {
-            node.Value.Accept(this);
-        }
+        node.Value?.Accept(this);
         Emit(OpCode.RETURN);
         return this;
     }
 
-    public BytecodeGenerator VisitIfStatement(IfStatement node)
+    public BytecodeGenerator VisitIfStatement(IfStatement node) // TODO: EmitPlaceholder + Patch
     {
         node.Condition.Accept(this);
 
-        var jumpIfFalsePos = _currentFunction.Code.Count;
-        Emit(OpCode.JUMP_IF_FALSE, 0);
+        int jumpFalse = EmitPlaceholder(OpCode.JUMP_IF_FALSE);
 
         node.ThenBranch.Accept(this);
 
-        var jumpEndPos = _currentFunction.Code.Count;
-        Emit(OpCode.JUMP, 0);
-
-        _currentFunction.Code[jumpIfFalsePos] = new Instruction(OpCode.JUMP_IF_FALSE, _currentFunction.Code.Count);
-
-        node.ElseBranch?.Accept(this);
-
-        _currentFunction.Code[jumpEndPos] = new Instruction(OpCode.JUMP, _currentFunction.Code.Count);
+        if (node.ElseBranch != null)
+        {
+            int jumpEnd = EmitPlaceholder(OpCode.JUMP);
+            Patch(jumpFalse);
+            node.ElseBranch.Accept(this);
+            Patch(jumpEnd);
+        }
+        else
+        {
+            Patch(jumpFalse);
+        }
 
         return this;
+    }
+
+    private int EmitPlaceholder(OpCode opCode) // TODO
+    {
+        return 0;
+    }
+
+    private void Patch(int jumpPos) // TODO;
+    {
+        return;
     }
 
     public BytecodeGenerator VisitWhileStatement(WhileStatement node)
@@ -204,75 +182,14 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
-    public BytecodeGenerator VisitForStatement(ForStatement node)
+    public BytecodeGenerator VisitForStatement(ForStatement node) // TODO
     {
-        node.Initializer?.Accept(this);
-
-        var loopStart = _currentFunction.Code.Count;
-
-        node.Condition?.Accept(this);
-
-        int exitJump = _currentFunction.Code.Count;
-        Emit(OpCode.JUMP_IF_FALSE, 0);
-
-        node.Body.Accept(this);
-
-        if (node.Increment != null)
-        {
-            node.Increment.Accept(this);
-            Emit(OpCode.POP);
-        }
-
-        Emit(OpCode.JUMP, loopStart);
-
-        _currentFunction.Code[exitJump] = new Instruction(OpCode.JUMP_IF_FALSE, _currentFunction.Code.Count);
-
         return this;
     }
 
     // --- Expressions ---
-    public BytecodeGenerator VisitBinaryExpression(BinaryExpression node)
+    public BytecodeGenerator VisitBinaryExpression(BinaryExpression node) // TODO: Складываются не только инты, что делать с массивами, double и т.д.
     {
-        if (node.Operator.Type == TokenType.ASSIGN)
-        {
-            // 1. RHS
-            node.Right.Accept(this);
-
-            // 2. LHS
-            switch (node.Left)
-            {
-                case IdentifierExpression id:
-                {
-                    var slot = _locals.GetSlot(id.Name);
-                    Emit(OpCode.STORE_LOCAL, slot);
-                    break;
-                }
-
-                case MemberAccessExpression member:
-                {
-                    member.Object.Accept(this);
-
-                    int fieldSlot = ResolveFieldSlot(member);
-                    Emit(OpCode.STORE_FIELD, fieldSlot);
-                    break;
-                }
-
-                case ArrayAccessExpression array:
-                {
-                    array.Target.Accept(this);
-                    array.Index.Accept(this);
-                    Emit(OpCode.STORE_ELEMENT);
-                    break;
-                }
-
-                default:
-                    throw new InvalidOperationException("Invalid assignment target");
-            }
-
-            return this;
-        }
-
-        // обычные бинарные выражения
         node.Left.Accept(this);
         node.Right.Accept(this);
 
@@ -293,146 +210,128 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
-    public BytecodeGenerator VisitUnaryExpression(UnaryExpression node)
+    public BytecodeGenerator VisitUnaryExpression(UnaryExpression node) // TODO
     {
-        node.Operand.Accept(this);
-
-        switch (node.Operator.Type)
-        {
-            case TokenType.MINUS: Emit(OpCode.NEG_INT); break;
-            case TokenType.NOT: Emit(OpCode.NOT_BOOL); break;
-            default: throw new NotSupportedException($"Unary operator {node.Operator.Type}");
-        }
-
         return this;
     }
 
-    public BytecodeGenerator VisitLiteralExpression(LiteralExpression node)
+    public BytecodeGenerator VisitLiteralExpression(LiteralExpression node) // TODO: AddConstant
     {
-        object value;
-
-        if (node.Token != null)
-        {
-            if (node.Token.IsLiteral)
-            {
-                if (node.Token.Type == TokenType.BOOL_LITERAL)
-                    value = node.Token.GetBoolValue();
-                else if (node.Token.Type == TokenType.NUMBER || node.Token.Type == TokenType.FLOAT_LITERAL)
-                    value = node.Token.GetNumericValue();
-                else
-                    value = node.Token.GetStringValue();
-            }
-            else
-            {
-                value = node.Value;
-            }
-        }
-        else
-        {
-            value = node.Value;
-        }
-
-        int index = _program.ConstantPool.Count;
-        _program.ConstantPool.Add(value);
-
-        Emit(OpCode.PUSH_CONST, index);
+        int constId = AddConstant(node.Value);
+        Emit(OpCode.PUSH_CONST, constId);
         return this;
     }
 
-    public BytecodeGenerator VisitIdentifierExpression(IdentifierExpression node)
+    public BytecodeGenerator VisitIdentifierExpression(IdentifierExpression node) // TODO: проверить взаимосвязь с Visit Variable Declaration
     {
-        var slot = _locals.GetSlot(node.Name);
+        var slot = Locals.Resolve(node.Name);
         Emit(OpCode.LOAD_LOCAL, slot);
         return this;
     }
 
-    public BytecodeGenerator VisitCallExpression(CallExpression node)
+    public BytecodeGenerator VisitCallExpression(CallExpression node) // TODO: ResolveFunction
     {
         foreach (var arg in node.Arguments)
-        {
             arg.Accept(this);
-        }
 
-        var funcIndex = _program.Functions.FindIndex(
-            f => f.Name == ((IdentifierExpression)node.Callee).Name);
-        Emit(OpCode.CALL, funcIndex);
-        return this;
-    }
-
-    public BytecodeGenerator VisitTernaryExpression(TernaryExpression node)
-    {
-        node.Condition.Accept(this);
-
-        var falseJump = _currentFunction.Code.Count;
-        Emit(OpCode.JUMP_IF_FALSE, 0);
-
-        node.ThenBranch.Accept(this);
-
-        var endJump = _currentFunction.Code.Count;
-        Emit(OpCode.JUMP, 0);
-
-        _currentFunction.Code[falseJump] = new Instruction(OpCode.JUMP_IF_FALSE, _currentFunction.Code.Count);
-
-        node.ElseBranch.Accept(this);
-
-        _currentFunction.Code[endJump] = new Instruction(OpCode.JUMP, _currentFunction.Code.Count);
-
-        return this;
-    }
-
-    public BytecodeGenerator VisitArrayAccessExpression(ArrayAccessExpression node)
-    {
-        node.Target.Accept(this);
-        node.Index.Accept(this);
-        Emit(OpCode.LOAD_ELEMENT);
-        return this;
-    }
-
-    public BytecodeGenerator VisitMemberAccessExpression(MemberAccessExpression node)
-    {
-        node.Object.Accept(this);
-
-        int fieldIndex = _program.ConstantPool.IndexOf(node.MemberName);
-        if (fieldIndex < 0)
+        if (node.Callee is IdentifierExpression id)
         {
-            fieldIndex = _program.ConstantPool.Count;
-            _program.ConstantPool.Add(node.MemberName);
+            int fnId = ResolveFunction(id.Name);
+            Emit(OpCode.CALL_FUNCTION, fnId);
         }
 
-        Emit(OpCode.LOAD_FIELD, fieldIndex);
         return this;
     }
 
-    public BytecodeGenerator VisitNewArrayExpression(NewArrayExpression node)
+    public BytecodeGenerator VisitTernaryExpression(TernaryExpression node) // TODO
     {
-        node.SizeExpression.Accept(this);
-
-        int typeIndex = _program.ConstantPool.IndexOf(node.ElementType);
-        if (typeIndex < 0)
-        {
-            typeIndex = _program.ConstantPool.Count;
-            _program.ConstantPool.Add(node.ElementType);
-        }
-
-        Emit(OpCode.NEW_ARRAY, typeIndex);
         return this;
     }
 
-    public BytecodeGenerator VisitNewObjectExpression(NewObjectExpression node)
+    public BytecodeGenerator VisitArrayAccessExpression(ArrayAccessExpression node) // TODO
     {
-        foreach (var arg in node.Arguments)
-        {
-            arg.Accept(this);
-        }
-
-        int classIndex = _program.ConstantPool.IndexOf(node.ClassName);
-        if (classIndex < 0)
-        {
-            classIndex = _program.ConstantPool.Count;
-            _program.ConstantPool.Add(node.ClassName);
-        }
-
-        Emit(OpCode.NEW_OBJECT, classIndex);
         return this;
+    }
+
+    public BytecodeGenerator VisitMemberAccessExpression(MemberAccessExpression node) // TODO
+    {
+        return this;
+    }
+
+    public BytecodeGenerator VisitNewArrayExpression(NewArrayExpression node) // TODO
+    {
+        return this;
+    }
+
+    public BytecodeGenerator VisitNewObjectExpression(NewObjectExpression node) // TODO
+    {
+        return this;
+    }
+
+    // Разрешение типа
+    private BytecodeType ResolveType(string typeName)
+    {
+        if (_resolvedTypes.TryGetValue(typeName, out var cached))
+            return cached;
+
+        BytecodeType result;
+
+        // Массив
+        if (typeName.EndsWith("[]"))
+        {
+            var elementName = typeName[..^2];
+            var elementType = ResolveType(elementName);
+
+            result = new ArrayType(elementType);
+        }
+        // Другие примитивы
+        else
+        {
+            result = typeName switch
+            {
+                "int"    => GetOrCreatePrimitive("int"),
+                "double" => GetOrCreatePrimitive("double"),
+                "bool"   => GetOrCreatePrimitive("bool"),
+                "char"   => GetOrCreatePrimitive("char"),
+                "string" => GetOrCreatePrimitive("string"),
+                "void"   => GetOrCreatePrimitive("void"),
+                _        => ResolveClassType(typeName)
+            };
+        }
+
+        // Регистрация типа в Program
+        result.TypeId = _program.Types.Count;
+        _program.Types.Add(result);
+        _resolvedTypes[typeName] = result;
+
+        return result;
+    }
+    
+    private PrimitiveType GetOrCreatePrimitive(string name)
+    {
+        if (_primitiveTypes.TryGetValue(name, out var t))
+            return t;
+
+        var type = new PrimitiveType(name);
+        _primitiveTypes[name] = type;
+        return type;
+    }
+
+    private BytecodeType ResolveClassType(string name)
+    {
+        var cls = _program.Classes.FirstOrDefault(c => c.Name == name);
+        return cls == null ?
+            throw new InvalidOperationException($"Unknown class type '{name}'")
+            : new ClassType(cls.ClassId, cls.Name);
+    }
+
+    private int ResolveFunction(string name) // TODO
+    {
+        return 0;
+    }
+
+    private int AddConstant(object name) // TODO
+    {
+        return 0;
     }
 }

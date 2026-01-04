@@ -3,36 +3,47 @@
 /// <summary>
 /// Управление слотами для локальных переменных и параметров
 /// </summary>
-public class LocalSlotManager
+public sealed class LocalSlotManager
 {
-    private readonly Dictionary<string, int> _locals = new();
+    private readonly Stack<Dictionary<string, int>> _scopes = new();
     private int _nextSlot = 0;
+
+    public void EnterScope()
+    {
+        _scopes.Push(new Dictionary<string, int>());
+    }
+
+    public void ExitScope()
+    {
+        _scopes.Pop();
+    }
 
     public int Declare(string name)
     {
-        if (_locals.ContainsKey(name))
-        {
-            throw new InvalidOperationException($"Локальная переменная '{name}' уже объявлена");
-        }
+        var scope = _scopes.Peek();
 
-        int slot = _nextSlot;
-        _locals[name] = slot;
-        _nextSlot++;
+        if (scope.ContainsKey(name))
+            throw new InvalidOperationException($"Variable '{name}' already declared in this scope");
+
+        var slot = _nextSlot++;
+        scope[name] = slot;
         return slot;
     }
 
-    public int GetSlot(string name)
+    public int Resolve(string name)
     {
-        if (!_locals.TryGetValue(name, out var slot))
+        foreach (var scope in _scopes)
         {
-            throw new InvalidOperationException($"Локальная переменная '{name}' не найдена");
+            if (scope.TryGetValue(name, out var slot))
+                return slot;
         }
-        return slot;
+
+        throw new InvalidOperationException($"Variable '{name}' not found");
     }
 
     public void Reset()
     {
-        _locals.Clear();
+        _scopes.Clear();
         _nextSlot = 0;
     }
 }
