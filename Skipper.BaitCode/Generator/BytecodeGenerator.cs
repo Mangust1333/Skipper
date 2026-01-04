@@ -94,7 +94,7 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         if (node.Initializer != null)
         {
             node.Initializer.Accept(this);
-            Emit(OpCode.STORE_LOCAL, slot);
+            Emit(OpCode.STORE, slot);
         }
 
         return this;
@@ -135,13 +135,13 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
     {
         node.Condition.Accept(this);
 
-        int jumpFalse = EmitPlaceholder(OpCode.JUMP_IF_FALSE);
+        var jumpFalse = EmitPlaceholder(OpCode.JUMP_IF_FALSE);
 
         node.ThenBranch.Accept(this);
 
         if (node.ElseBranch != null)
         {
-            int jumpEnd = EmitPlaceholder(OpCode.JUMP);
+            var jumpEnd = EmitPlaceholder(OpCode.JUMP);
             Patch(jumpFalse);
             node.ElseBranch.Accept(this);
             Patch(jumpEnd);
@@ -154,31 +154,30 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
-    private int EmitPlaceholder(OpCode opCode) // TODO
+    private int EmitPlaceholder(OpCode opCode)
     {
-        return 0;
+        if (_currentFunction == null)
+            throw new NullReferenceException("No function declared in scope");
+
+        var placeholderIndex = _currentFunction.Code.Count;
+        Emit(opCode, 0); // 0 будет заменено позже
+        return placeholderIndex;
     }
 
-    private void Patch(int jumpPos) // TODO;
+    private void Patch(int instructionIndex)
     {
-        return;
+        if (_currentFunction == null)
+            throw new NullReferenceException("No function declared in scope");
+        
+        var instr = _currentFunction.Code[instructionIndex];
+        _currentFunction.Code[instructionIndex] = new Instruction(
+            instr.OpCode,
+            _currentFunction.Code.Count
+        );
     }
 
     public BytecodeGenerator VisitWhileStatement(WhileStatement node)
     {
-        var loopStart = _currentFunction.Code.Count;
-
-        node.Condition.Accept(this);
-
-        var exitJump = _currentFunction.Code.Count;
-        Emit(OpCode.JUMP_IF_FALSE, 0);
-
-        node.Body.Accept(this);
-
-        Emit(OpCode.JUMP, loopStart);
-
-        _currentFunction.Code[exitJump] = new Instruction(OpCode.JUMP_IF_FALSE, _currentFunction.Code.Count);
-
         return this;
     }
 
@@ -188,26 +187,81 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
     }
 
     // --- Expressions ---
-    public BytecodeGenerator VisitBinaryExpression(BinaryExpression node) // TODO: Складываются не только инты, что делать с массивами, double и т.д.
+    public BytecodeGenerator VisitBinaryExpression(BinaryExpression node)
     {
+        // Присваивание
+        if (node.Operator.Type == TokenType.ASSIGN)
+        {
+            // 1. вычисляем r-value
+            node.Right.Accept(this);
+
+            // 2. дублируем, т.к. assignment — expression
+            Emit(OpCode.DUP);
+
+            // 3. сохраняем в l-value
+            EmitStore(node.Left);
+
+            return this;
+        }
+        
         node.Left.Accept(this);
         node.Right.Accept(this);
-
+    
+        // Для остальных операций
         switch (node.Operator.Type)
         {
-            case TokenType.PLUS: Emit(OpCode.ADD_INT); break;
-            case TokenType.MINUS: Emit(OpCode.SUB_INT); break;
-            case TokenType.STAR: Emit(OpCode.MUL_INT); break;
-            case TokenType.SLASH: Emit(OpCode.DIV_INT); break;
+            case TokenType.PLUS: Emit(OpCode.ADD); break;
+            case TokenType.MINUS: Emit(OpCode.SUB); break;
+            case TokenType.STAR: Emit(OpCode.MUL); break;
+            case TokenType.SLASH: Emit(OpCode.DIV); break;
+            case TokenType.MODULO: Emit(OpCode.MOD); break;
             case TokenType.EQUAL: Emit(OpCode.CMP_EQ); break;
             case TokenType.NOT_EQUAL: Emit(OpCode.CMP_NE); break;
             case TokenType.LESS: Emit(OpCode.CMP_LT); break;
             case TokenType.GREATER: Emit(OpCode.CMP_GT); break;
+            case TokenType.LESS_EQUAL: Emit(OpCode.CMP_LE); break;
+            case TokenType.GREATER_EQUAL: Emit(OpCode.CMP_GE); break;
+            case TokenType.AND: Emit(OpCode.AND); break;
+            case TokenType.OR: Emit(OpCode.OR); break;
             default:
-                throw new NotSupportedException(node.Operator.Type.ToString());
+                throw new NotSupportedException($"Operator {node.Operator.Type} not supported");
         }
-
+    
         return this;
+    }
+    
+    private void EmitStore(Expression target)
+    {
+        target.Accept(this);
+        
+        switch (target)
+        {
+            case IdentifierExpression id:
+            {
+                var slot = Locals.Resolve(id.Name);
+                Emit(OpCode.STORE, slot);
+                break;
+            }
+
+            case ArrayAccessExpression arr:
+            {
+                arr.Target.Accept(this);
+                arr.Index.Accept(this);
+                Emit(OpCode.SET_ELEMENT);
+                break;
+            }
+
+            case MemberAccessExpression mem:
+            {
+                mem.Object.Accept(this);
+                var fieldId = ResolveField(mem);
+                Emit(OpCode.SET_FIELD, fieldId);
+                break;
+            }
+
+            default:
+                throw new InvalidOperationException("Invalid assignment target");
+        }
     }
 
     public BytecodeGenerator VisitUnaryExpression(UnaryExpression node) // TODO
@@ -215,29 +269,29 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
-    public BytecodeGenerator VisitLiteralExpression(LiteralExpression node) // TODO: AddConstant
+    public BytecodeGenerator VisitLiteralExpression(LiteralExpression node)
     {
         int constId = AddConstant(node.Value);
-        Emit(OpCode.PUSH_CONST, constId);
+        Emit(OpCode.PUSH, constId);
         return this;
     }
 
     public BytecodeGenerator VisitIdentifierExpression(IdentifierExpression node) // TODO: проверить взаимосвязь с Visit Variable Declaration
     {
         var slot = Locals.Resolve(node.Name);
-        Emit(OpCode.LOAD_LOCAL, slot);
+        Emit(OpCode.LOAD, slot);
         return this;
     }
 
-    public BytecodeGenerator VisitCallExpression(CallExpression node) // TODO: ResolveFunction
+    public BytecodeGenerator VisitCallExpression(CallExpression node)
     {
         foreach (var arg in node.Arguments)
             arg.Accept(this);
 
         if (node.Callee is IdentifierExpression id)
         {
-            int fnId = ResolveFunction(id.Name);
-            Emit(OpCode.CALL_FUNCTION, fnId);
+            var functionId = ResolveFunction(id.Name);
+            Emit(OpCode.CALL, functionId);
         }
 
         return this;
@@ -325,13 +379,17 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
             : new ClassType(cls.ClassId, cls.Name);
     }
 
-    private int ResolveFunction(string name) // TODO
+    private int ResolveFunction(string name)
     {
-        return 0;
+        var func = _program.Functions.FirstOrDefault(f => f.Name == name);
+        if (func == null)
+            throw new InvalidOperationException($"Function '{name}' not found");
+        return func.FunctionId;
     }
 
-    private int AddConstant(object name) // TODO
+    private int AddConstant(object value)
     {
-        return 0;
+        _program.ConstantPool.Add(value);
+        return _program.ConstantPool.Count - 1;
     }
 }

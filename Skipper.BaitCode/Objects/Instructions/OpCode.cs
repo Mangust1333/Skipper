@@ -2,51 +2,52 @@
 
 public enum OpCode
 {
-    // stack
-    PUSH_CONST,
+    // Базовые операции
+    PUSH,        // [const_id]
     POP,
-
-    // locals
-    LOAD_LOCAL,
-    STORE_LOCAL,
-
-    // arithmetic
-    ADD_INT,
-    SUB_INT,
-    MUL_INT,
-    DIV_INT,
-    MOD_INT,
-
-    // compare
-    CMP_EQ,
-    CMP_NE,
-    CMP_LT,
-    CMP_GT,
-    CMP_LE,
-    CMP_GE,
-
-    // logic
-    AND,
-    OR,
-    NOT,
-
-    // control
-    JUMP,
-    JUMP_IF_FALSE,
-
-    // calls
-    CALL_FUNCTION,
-    CALL_METHOD,
-
-    // objects
-    NEW_OBJECT,
-    LOAD_FIELD,
-    STORE_FIELD,
-
-    // arrays
-    NEW_ARRAY,
-    LOAD_ELEMENT,
-    STORE_ELEMENT,
-
-    RETURN
+    LOAD,        // [slot]
+    STORE,       // [slot]
+    DUP,
+    SWAP,
+    
+    // Арифметика
+    ADD,         // a b -> (a + b)
+    SUB,         // a b -> (a - b)
+    MUL,         // a b -> (a * b)
+    DIV,         // a b -> (a / b)
+    MOD,         // a b -> (a % b)
+    NEG,         // a -> (-a)
+    
+    // Сравнения
+    CMP_EQ,      // a b -> (a == b)
+    CMP_NE,      // a b -> (a != b)
+    CMP_LT,      // a b -> (a < b)
+    CMP_GT,      // a b -> (a > b)
+    CMP_LE,      // a b -> (a <= b)
+    CMP_GE,      // a b -> (a >= b)
+    
+    // Логика
+    AND,         // a b -> (a && b)
+    OR,          // a b -> (a || b)
+    NOT,         // a -> (!a)
+    
+    // Преобразования типов
+    TO_INT,
+    TO_FLOAT,
+    TO_BOOL,
+    TO_STRING,
+    
+    // Управление
+    JUMP,        // [offset]
+    JUMP_IF_TRUE,// [offset]
+    JUMP_IF_FALSE,// [offset]
+    CALL,        // [func_id, arg_count]
+    RETURN,
+    
+    // Объекты
+    NEW,         // [class_id]
+    GET_FIELD,   // [field_id]
+    SET_FIELD,   // [field_id]
+    GET_ELEMENT, // 
+    SET_ELEMENT, //
 }

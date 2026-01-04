@@ -2,8 +2,8 @@
 
 public sealed class Instruction(OpCode opCode, params object[] operands)
 {
-    private OpCode OpCode { get; } = opCode;
-    private IReadOnlyList<object> Operands { get; } = operands;
+    public OpCode OpCode { get; } = opCode;
+    public IReadOnlyList<object> Operands { get; } = operands;
 
     public override string ToString()
     {
