@@ -45,7 +45,8 @@ public enum OpCode
     RETURN,
     
     // Объекты
-    NEW,         // [class_id]
+    NEW_OBJECT,         // [object_id]
+    NEW_ARRAY,   // [array_id]
     GET_FIELD,   // [field_id]
     SET_FIELD,   // [field_id]
     GET_ELEMENT, // 
