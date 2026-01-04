@@ -192,8 +192,13 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         // Присваивание
         if (node.Operator.Type == TokenType.ASSIGN)
         {
+            // 1. вычисляем r-value
             node.Right.Accept(this);
+
+            // 2. дублируем, т.к. assignment — expression
             Emit(OpCode.DUP);
+
+            // 3. сохраняем в l-value
             EmitStore(node.Left);
 
             return this;
@@ -279,8 +284,17 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         }
     }
 
-    public BytecodeGenerator VisitUnaryExpression(UnaryExpression node) // TODO
+    public BytecodeGenerator VisitUnaryExpression(UnaryExpression node)
     {
+        node.Operand.Accept(this);
+        switch (node.Operator.Type)
+        {
+            case TokenType.NOT: Emit(OpCode.NOT); break;
+            case TokenType.MINUS: Emit(OpCode.NEG); break;
+            default:
+                throw new NotSupportedException($"Operator {node.Operator.Type} not supported");
+        }
+
         return this;
     }
 
@@ -312,33 +326,60 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
-    public BytecodeGenerator VisitTernaryExpression(TernaryExpression node) // TODO
+    public BytecodeGenerator VisitTernaryExpression(TernaryExpression node)
     {
+        node.Condition.Accept(this);
+        var jumpFalse = EmitPlaceholder(OpCode.JUMP_IF_FALSE);
+
+        node.Condition.Accept(this);
+        var jumpEnd = EmitPlaceholder(OpCode.JUMP);
+
+        Patch(jumpFalse);
+        node.ElseBranch.Accept(this);
+        Patch(jumpEnd);
+        
         return this;
     }
 
-    public BytecodeGenerator VisitArrayAccessExpression(ArrayAccessExpression node) // TODO
+    public BytecodeGenerator VisitArrayAccessExpression(ArrayAccessExpression node)
     {
+        node.Target.Accept(this);
+        node.Index.Accept(this);
+        Emit(OpCode.GET_ELEMENT);
         return this;
     }
 
     public BytecodeGenerator VisitMemberAccessExpression(MemberAccessExpression node) // TODO
     {
+        node.Object.Accept(this);
+
+        var objectType = ResolveExpressionType(node.Object);
+        var (_, fieldId, _) = ResolveMember(node);
+
+        Emit(OpCode.GET_FIELD, fieldId);
         return this;
     }
 
     public BytecodeGenerator VisitNewArrayExpression(NewArrayExpression node) // TODO
     {
+        node.SizeExpression.Accept(this);
+        Emit(OpCode.NEW_ARRAY);
         return this;
     }
 
     public BytecodeGenerator VisitNewObjectExpression(NewObjectExpression node) // TODO
     {
+        foreach (var arg in node.Arguments)
+            arg.Accept(this);
+        
+        var cls = _program.Classes.FirstOrDefault(c => c.Name == node.ClassName);
+        if (cls == null)
+            throw new InvalidOperationException($"Unknown class '{node.ClassName}'");
+
+        Emit(OpCode.NEW_OBJECT, cls.ClassId);
         return this;
     }
 
-    
-    
     // Разрешение типа
     private BytecodeType ResolveType(string typeName)
     {
@@ -378,6 +419,21 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return result;
     }
     
+    private BytecodeType ResolveExpressionType(Expression expr)
+    {
+        return expr switch
+        {
+            LiteralExpression l        => ResolveType(expr.GetType().Name),
+            IdentifierExpression id    => ResolveIdentifierType(id.Name),
+            ArrayAccessExpression a    => ((ArrayType)ResolveExpressionType(a.Target)).ElementType,
+            MemberAccessExpression m   => ResolveMember(m).Type,
+            CallExpression c           => ResolveCallType(c),
+            NewObjectExpression n      => ResolveType(n.ClassName),
+            NewArrayExpression a       => new ArrayType(ResolveType(a.ElementType)),
+            _ => throw new NotSupportedException($"Type resolution not supported for {expr.NodeType}")
+        };
+    }
+    
     private PrimitiveType GetOrCreatePrimitive(string name)
     {
         if (_primitiveTypes.TryGetValue(name, out var t))
@@ -402,6 +458,67 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         if (func == null)
             throw new InvalidOperationException($"Function '{name}' not found");
         return func.FunctionId;
+    }
+    
+    private BytecodeType ResolveIdentifierType(string name)
+    {
+        if (!_resolvedTypes.TryGetValue(name, out var type))
+            throw new InvalidOperationException($"Unknown identifier '{name}'");
+
+        return type;
+    }
+
+    private BytecodeType ResolveCallType(CallExpression node)
+    {
+        switch (node.Callee)
+        {
+            case IdentifierExpression id:
+            {
+                var funcId = ResolveFunction(id.Name);
+                return _program.Functions[funcId].ReturnType;
+            }
+
+            case MemberAccessExpression member:
+            {
+                var (id, type, isField) = ResolveMember(member);
+
+                if (isField)
+                    throw new InvalidOperationException(
+                        $"'{member.MemberName}' is a field, not a method");
+
+                return type;
+            }
+
+            default:
+                throw new InvalidOperationException("Invalid call target");
+        }
+    }
+
+    
+    private (int Id, BytecodeType Type, bool IsField) ResolveMember(MemberAccessExpression node)
+    {
+        var objectType = ResolveExpressionType(node.Object);
+
+        if (objectType is not ClassType clsType)
+            throw new InvalidOperationException("Member access on non-class type");
+
+        var cls = _program.Classes.First(c => c.ClassId == clsType.ClassId);
+
+        if (cls.Fields.TryGetValue(node.MemberName, out var field))
+            return (field.FieldId, field.Type, true);
+
+        if (cls.Methods.TryGetValue(node.MemberName, out var methodId))
+            return (methodId, ResolveMethodReturnType(methodId), false);
+
+        throw new InvalidOperationException($"Member '{node.MemberName}' not found");
+    }
+
+    private BytecodeType ResolveMethodReturnType(int methodId)
+    {
+        if (methodId < 0 || methodId >= _program.Functions.Count)
+            throw new InvalidOperationException($"Invalid method id {methodId}");
+
+        return _program.Functions[methodId].ReturnType;
     }
 
     private int AddConstant(object value)
