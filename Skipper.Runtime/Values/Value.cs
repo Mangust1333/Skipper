@@ -5,35 +5,106 @@ public struct Value
     public ValueKind Kind;
     public long Raw;
 
-    public static Value FromInt(int v) => new()
+    public Value(long raw)
     {
-        Kind = ValueKind.Int, Raw = v
-    };
+        Raw = raw;
+        Kind = ValueKind.Int;
+    }
 
-    public static Value FromDouble(double v) => new()
+    public Value(ValueKind kind, long raw)
     {
-        Kind = ValueKind.Double, Raw = BitConverter.DoubleToInt64Bits(v)
-    };
+        Kind = kind;
+        Raw = raw;
+    }
 
-    public static Value FromBool(bool v) => new()
+    public static Value FromInt(int v)
     {
-        Kind = ValueKind.Bool, Raw = v ? 1 : 0
-    };
+        return new()
+        {
+            Kind = ValueKind.Int,
+            Raw = v
+        };
+    }
 
-    public static Value FromChar(char v) => new()
+    public static Value FromDouble(double v)
     {
-        Kind = ValueKind.Char, Raw = v
-    };
+        return new()
+        {
+            Kind = ValueKind.Double,
+            Raw = BitConverter.DoubleToInt64Bits(v)
+        };
+    }
 
-    public static Value FromObject(nint ptr) => new()
+    public static Value FromBool(bool v)
     {
-        Kind = ValueKind.ObjectRef, Raw = ptr
-    };
+        return new()
+        {
+            Kind = ValueKind.Bool,
+            Raw = v ? 1 : 0
+        };
+    }
 
-    public static Value Null() => new()
+    public static Value FromChar(char v)
     {
-        Kind = ValueKind.Null, Raw = 0
-    };
+        return new()
+        {
+            Kind = ValueKind.Char,
+            Raw = v
+        };
+    }
 
-    public nint AsObject() => (nint)Raw;
+    public static Value FromObject(nint ptr)
+    {
+        return new()
+        {
+            Kind = ValueKind.ObjectRef,
+            Raw = ptr
+        };
+    }
+
+    public static Value Null()
+    {
+        return new()
+        {
+            Kind = ValueKind.Null,
+            Raw = 0
+        };
+    }
+
+    public int AsInt()
+    {
+        return (int)Raw;
+    }
+
+    public bool AsBool()
+    {
+        return Raw != 0;
+    }
+
+    public double AsDouble()
+    {
+        return BitConverter.Int64BitsToDouble(Raw);
+    }
+
+    public char AsChar()
+    {
+        return (char)Raw;
+    }
+
+    public nint AsObject()
+    {
+        return (nint)Raw;
+    }
+
+    public override string ToString()
+    {
+        return Kind switch
+        {
+            ValueKind.Int => AsInt().ToString(),
+            ValueKind.Bool => AsBool().ToString(),
+            ValueKind.Double => AsDouble().ToString(),
+            ValueKind.Null => "null",
+            _ => $"{Kind}:{Raw}"
+        };
+    }
 }

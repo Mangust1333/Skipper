@@ -1,5 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.1.11312.151 d18.0
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Skipper.Lexer", "Skipper.Lexer\Skipper.Lexer.csproj", "{428B6FA1-916C-4851-AB82-DE9D69E1BF16}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{857609B5-9802-4569-86EF-C77115BB9D95}"
@@ -25,6 +28,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Skipper.Runtime.Tests", "Skipper.Runtime.Tests\Skipper.Runtime.Tests.csproj", "{0675838C-17F9-4801-91DD-1ABFB74680EA}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Skipper.VM", "Skipper.VM\Skipper.VM.csproj", "{AA735A24-6094-4EB1-B328-57EBD8B3E6F5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Skipper.VM.Tests", "Skipper.VM.Tests\Skipper.VM.Tests.csproj", "{4E0F48A6-3A0B-48C9-BF11-E2152C8A2807}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -80,6 +85,13 @@ Global
 		{AA735A24-6094-4EB1-B328-57EBD8B3E6F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AA735A24-6094-4EB1-B328-57EBD8B3E6F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AA735A24-6094-4EB1-B328-57EBD8B3E6F5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E0F48A6-3A0B-48C9-BF11-E2152C8A2807}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E0F48A6-3A0B-48C9-BF11-E2152C8A2807}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E0F48A6-3A0B-48C9-BF11-E2152C8A2807}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E0F48A6-3A0B-48C9-BF11-E2152C8A2807}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{D6751EFC-3147-4F44-A1EB-3D1007B6402B} = {857609B5-9802-4569-86EF-C77115BB9D95}
@@ -87,5 +99,9 @@ Global
 		{B9CFA849-4340-402A-A2F2-80618AE3B5F3} = {857609B5-9802-4569-86EF-C77115BB9D95}
 		{26370ED0-EF11-4746-852D-367F0E3A1E36} = {857609B5-9802-4569-86EF-C77115BB9D95}
 		{0675838C-17F9-4801-91DD-1ABFB74680EA} = {857609B5-9802-4569-86EF-C77115BB9D95}
+		{4E0F48A6-3A0B-48C9-BF11-E2152C8A2807} = {857609B5-9802-4569-86EF-C77115BB9D95}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {6392B987-0155-4375-857D-3B12372F98E8}
 	EndGlobalSection
 EndGlobal

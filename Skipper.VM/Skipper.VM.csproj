@@ -7,6 +7,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\Skipper.BaitCode\Skipper.BaitCode.csproj" />
       <ProjectReference Include="..\Skipper.Runtime\Skipper.Runtime.csproj" />
     </ItemGroup>
 
