@@ -310,4 +310,84 @@ public class ExpressionTests
         var index = Assert.IsType<LiteralExpression>(arrayAccess.Index);
         Assert.Equal(0, index.Value);
     }
+
+    [Fact]
+    public void Parse_BinaryExpression_LeftAssociativity()
+    {
+        // Arrange
+        const string source = "10 - 5 - 2";
+
+        // Act
+        var expr = TestHelpers.ParseExpression<BinaryExpression>(source);
+
+        // Assert: Структура должна быть ((10 - 5) - 2)
+        // Корневой оператор - это второй минус
+        Assert.Equal(TokenType.MINUS, expr.Operator.Type);
+
+        // Справа должна быть 2
+        var right = Assert.IsType<LiteralExpression>(expr.Right);
+        Assert.Equal(2, right.Value);
+
+        // Слева должно быть выражение (10 - 5)
+        var left = Assert.IsType<BinaryExpression>(expr.Left);
+        Assert.Equal(TokenType.MINUS, left.Operator.Type);
+
+        Assert.Equal(10, Assert.IsType<LiteralExpression>(left.Left).Value);
+        Assert.Equal(5, Assert.IsType<LiteralExpression>(left.Right).Value);
+    }
+
+    [Fact]
+    public void Parse_Precedence_Not_vs_Equal()
+    {
+        // !a == b должно парситься как (!a) == b, а не !(a == b)
+
+        // Arrange
+        const string source = "!a == b";
+
+        // Act
+        var expr = TestHelpers.ParseExpression<BinaryExpression>(source);
+
+        // Assert
+        Assert.Equal(TokenType.EQUAL, expr.Operator.Type);
+
+        var left = Assert.IsType<UnaryExpression>(expr.Left);
+        Assert.Equal(TokenType.NOT, left.Operator.Type);
+    }
+
+    [Fact]
+    public void Parse_ImmediateAccess_OnNewArray()
+    {
+        // new int[5][0] — создание и сразу доступ
+
+        // Arrange
+        const string source = "new int[5][0]";
+
+        // Act
+        var expr = TestHelpers.ParseExpression<ArrayAccessExpression>(source);
+
+        // Assert
+        var newArray = Assert.IsType<NewArrayExpression>(expr.Target);
+        Assert.Equal("int", newArray.ElementType);
+
+        var index = Assert.IsType<LiteralExpression>(expr.Index);
+        Assert.Equal(0, index.Value);
+    }
+
+    [Fact]
+    public void Parse_ImmediateMethodCall_OnNewObject()
+    {
+        // new User().getName()
+
+        // Arrange
+        const string source = "new User().getName()";
+
+        // Act
+        var expr = TestHelpers.ParseExpression<CallExpression>(source);
+
+        // Assert
+        var memberAccess = Assert.IsType<MemberAccessExpression>(expr.Callee);
+        Assert.Equal("getName", memberAccess.MemberName);
+
+        Assert.IsType<NewObjectExpression>(memberAccess.Object);
+    }
 }

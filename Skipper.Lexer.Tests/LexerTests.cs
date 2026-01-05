@@ -177,6 +177,8 @@ public class LexerTests
     [InlineData("\"hello\"", "hello")]
     [InlineData("\"\"", "")]
     [InlineData("\"a\"", "a")]
+    [InlineData("\"Say \\\"Hello\\\"!\"", "Say \"Hello\"!")] // "Say \"Hello\"!" -> Say "Hello"!
+    [InlineData("\"Path\\\\To\\\\File\"", "Path\\To\\File")] // "Path\\To\\File" -> Path\To\File
     public void Tokenize_StringLiteral_ReturnsCorrectToken(string input, string expectedValue)
     {
         // Arrange
@@ -224,6 +226,9 @@ public class LexerTests
     [InlineData("var123")]
     [InlineData("camelCase")]
     [InlineData("PascalCase")]
+    [InlineData("var1")]
+    [InlineData("point2d")]
+    [InlineData("i_am_snake_case")]
     public void Tokenize_Identifier_ReturnsCorrectToken(string input)
     {
         // Arrange
@@ -462,5 +467,115 @@ public class LexerTests
         var error = result.Diagnostics[0];
         Assert.Equal(LexerDiagnosticLevel.Error, error.Level);
         Assert.Contains("Unknown character", error.Message);
+    }
+
+    [Fact]
+    public void Tokenize_UnterminatedBlockComment_ThrowsException()
+    {
+        // Arrange
+        const string source = "/* это начало комментария, а конца нет... ";
+        var lexer = new Lexer.Lexer(source);
+
+        // Act & Assert
+        Assert.Throws<LexerException>(() => lexer.Tokenize());
+    }
+
+    [Fact]
+    public void Tokenize_KeywordPrefixInIdentifier_ReturnsIdentifier()
+    {
+        // Arrange
+        // "int" и "return" — ключевые слова, но здесь они часть имени
+        const string source = "integer returnVal internal";
+        var lexer = new Lexer.Lexer(source);
+
+        // Act
+        var result = lexer.Tokenize();
+
+        // Assert
+        Assert.Equal(4, result.Count); // 3 id + EOF
+        Assert.Equal(TokenType.IDENTIFIER, result[0].Type);
+        Assert.Equal("integer", result[0].Text);
+
+        Assert.Equal(TokenType.IDENTIFIER, result[1].Type);
+        Assert.Equal("returnVal", result[1].Text);
+
+        Assert.Equal(TokenType.IDENTIFIER, result[2].Type);
+        Assert.Equal("internal", result[2].Text);
+    }
+
+    [Theory]
+    [InlineData("_")]
+    [InlineData("__init__")]
+    [InlineData("_123")]
+    [InlineData("var_name_1")]
+    public void Tokenize_ComplexIdentifiers_ReturnsIdentifier(string input)
+    {
+        // Arrange
+        var lexer = new Lexer.Lexer(input);
+
+        // Act
+        var result = lexer.Tokenize();
+
+        // Assert
+        Assert.Equal(TokenType.IDENTIFIER, result[0].Type);
+        Assert.Equal(input, result[0].Text);
+    }
+
+    [Fact]
+    public void Tokenize_NoSpacesAroundOperators_ReturnsCorrectTokens()
+    {
+        // Arrange
+        const string source = "x=1+y*(z-2);";
+        var lexer = new Lexer.Lexer(source);
+
+        // Act
+        var result = lexer.Tokenize();
+
+        // Assert
+        // x, =, 1, +, y, *, (, z, -, 2, ), ;, EOF
+        Assert.Equal(13, result.Count);
+        Assert.Equal(TokenType.IDENTIFIER, result[0].Type); // x
+        Assert.Equal(TokenType.ASSIGN, result[1].Type);     // =
+        Assert.Equal(TokenType.NUMBER, result[2].Type);     // 1
+        Assert.Equal(TokenType.PLUS, result[3].Type);       // +
+        Assert.Equal(TokenType.IDENTIFIER, result[4].Type); // y
+    }
+
+    [Fact]
+    public void Tokenize_LineCommentAtEOF_DoesNotCrash()
+    {
+        // Arrange
+        const string source = "x = 1 // end of file";
+        var lexer = new Lexer.Lexer(source);
+
+        // Act
+        var result = lexer.Tokenize();
+
+        // Assert
+        Assert.Equal(4, result.Count); // x, =, 1, EOF
+        Assert.Equal(TokenType.NUMBER, result[2].Type);
+        Assert.Equal(TokenType.EOF, result[3].Type);
+    }
+
+    [Fact]
+    public void Tokenize_MultipleDots_SplitsTokens()
+    {
+        // Arrange
+        const string source = "1.2.3";
+        var lexer = new Lexer.Lexer(source);
+
+        // Act
+        var result = lexer.Tokenize();
+
+        // Assert
+        // Ожидаем: [Double 1.2], [Dot .], [Int 3], [EOF]
+        Assert.Equal(4, result.Count);
+        Assert.Equal(TokenType.DOUBLE_LITERAL, result[0].Type);
+        Assert.Equal("1.2", result[0].Text);
+
+        Assert.Equal(TokenType.DOT, result[1].Type);
+
+        Assert.Equal(TokenType.NUMBER, result[2].Type);
+        Assert.Equal("3", result[2].Text);
     }
 }
