@@ -79,28 +79,44 @@ public class GeneratorTests
     public void Variables_DeclarationAndAssignment()
     {
         const string code = """
-                            fn main() {
-                                int x = 10;
-                                x = 20;
-                                int y = x;
-                            }
-                            """;
+                        fn main() {
+                            int x = 10;
+                            x = 20;
+                            int y = x;
+                        }
+                        """;
         var program = Generate(code);
         var inst = GetInstructions(program, "main");
 
-        // 1. int x = 10 -> PUSH 10, STORE 0
+        // 1. int x = 10; (VariableDeclaration)
+        // Генерирует: PUSH 10, STORE 0
+        Assert.Equal(OpCode.PUSH, inst[0].OpCode);
         Assert.Equal(OpCode.STORE, inst[1].OpCode);
         var xSlot = (int)inst[1].Operands[0];
 
-        // 2. x = 20 -> PUSH 20, STORE 0 (тот же слот)
-        Assert.Equal(OpCode.STORE, inst[3].OpCode);
-        Assert.Equal(xSlot, inst[3].Operands[0]);
+        // 2. x = 20; (ExpressionStatement -> Assignment)
+        // Генерирует: PUSH 20, DUP, STORE 0, POP
 
-        // 3. int y = x -> LOAD 0, STORE 1 (новый слот)
-        Assert.Equal(OpCode.LOAD, inst[4].OpCode);
+        // Index 2: PUSH 20
+        Assert.Equal(OpCode.PUSH, inst[2].OpCode);
+
+        // Index 3: DUP (Результат выражения присваивания)
+        Assert.Equal(OpCode.DUP, inst[3].OpCode);
+
+        // Index 4: STORE 0 (Запись в переменную)
+        Assert.Equal(OpCode.STORE, inst[4].OpCode);
         Assert.Equal(xSlot, inst[4].Operands[0]);
-        Assert.Equal(OpCode.STORE, inst[5].OpCode);
-        var ySlot = (int)inst[5].Operands[0];
+
+        // Index 5: POP (Сброс неиспользованного результата со стека)
+        Assert.Equal(OpCode.POP, inst[5].OpCode);
+
+        // 3. int y = x; (VariableDeclaration)
+        // Генерирует: LOAD 0, STORE 1
+        Assert.Equal(OpCode.LOAD, inst[6].OpCode);
+        Assert.Equal(xSlot, inst[6].Operands[0]);
+
+        Assert.Equal(OpCode.STORE, inst[7].OpCode);
+        var ySlot = (int)inst[7].Operands[0];
 
         Assert.NotEqual(xSlot, ySlot);
     }
