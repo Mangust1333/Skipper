@@ -65,4 +65,98 @@ public class SerializationTests
                 File.Delete(tempFile);
         }
     }
+
+    [Fact]
+    public void Serialization_ArrayTypes_RestoredCorrectly()
+    {
+        // Arrange: Программа с массивом
+        const string code = "fn main() { int[] arr; }";
+        var original = Generate(code);
+        var tempFile = Path.GetTempFileName();
+
+        try
+        {
+            new BytecodeWriter(original).SaveToFile(tempFile);
+            var loaded = BytecodeWriter.LoadFromFile(tempFile);
+
+            // Assert
+            // Ищем тип массива в таблице типов
+            var arrayType = loaded.Types.OfType<Skipper.BaitCode.Types.ArrayType>().FirstOrDefault();
+            Assert.NotNull(arrayType);
+
+            // Проверяем вложенный тип
+            var elemType = arrayType.ElementType as Skipper.BaitCode.Types.PrimitiveType;
+            Assert.NotNull(elemType);
+            Assert.Equal("int", elemType.Name);
+        } finally
+        {
+            if (File.Exists(tempFile))
+                File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void Serialization_ComplexInstructions_RestoredCorrectly()
+    {
+        // Arrange: CALL и JUMP (инструкции с операндами)
+        const string code = """
+                            fn foo() {}
+                            fn main() { 
+                                foo();      // CALL func_id
+                                if (true) {} // JUMP_IF_FALSE
+                            }
+                            """;
+        var original = Generate(code);
+        var tempFile = Path.GetTempFileName();
+
+        try
+        {
+            new BytecodeWriter(original).SaveToFile(tempFile);
+            var loaded = BytecodeWriter.LoadFromFile(tempFile);
+
+            var mainFunc = loaded.Functions.First(f => f.Name == "main");
+
+            // Проверяем CALL
+            var callInstr = mainFunc.Code.FirstOrDefault(i => i.OpCode == Skipper.BaitCode.Objects.Instructions.OpCode.CALL);
+            Assert.NotNull(callInstr);
+            Assert.NotEmpty(callInstr.Operands); // Операнд (ID функции) должен быть
+
+            // Проверяем JUMP
+            var jumpInstr = mainFunc.Code.FirstOrDefault(i => i.OpCode == Skipper.BaitCode.Objects.Instructions.OpCode.JUMP_IF_FALSE);
+            Assert.NotNull(jumpInstr);
+
+            // Нюанс JSON: Числа восстанавливаются как JsonElement. Проверяем, что операнд читаем.
+            var op0 = jumpInstr.Operands[0];
+            Assert.True(int.TryParse(op0.ToString(), out _), $"Operand {op0} should be parseable as int");
+        } finally
+        {
+            if (File.Exists(tempFile))
+                File.Delete(tempFile);
+        }
+    }
+
+    [Fact]
+    public void Serialization_EmptyProgram_DoesNotCrash()
+    {
+        // Arrange: Пустая программа (только main, без тела)
+        const string code = "fn main() {}";
+        var original = Generate(code);
+        var tempFile = Path.GetTempFileName();
+
+        try
+        {
+            // Act
+            new BytecodeWriter(original).SaveToFile(tempFile);
+            var loaded = BytecodeWriter.LoadFromFile(tempFile);
+
+            // Assert
+            Assert.NotNull(loaded);
+            Assert.Single(loaded.Functions); // Только main
+            Assert.Empty(loaded.Classes);
+        } finally
+        {
+            if (File.Exists(tempFile))
+                File.Delete(tempFile);
+        }
+    }
 }

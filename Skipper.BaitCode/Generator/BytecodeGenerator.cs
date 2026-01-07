@@ -68,8 +68,8 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
             name: node.Name,
             returnType: ResolveType(node.ReturnType),
             parameters: node.Parameters
-                .Select(p => (p.Name, ResolveType(p.TypeName)))
-                .ToList()
+            .Select(p => new FuncParam(p.Name, ResolveType(p.TypeName)))
+            .ToList()
         );
         
         _program.Functions.Add(function);
@@ -101,8 +101,12 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
     public BytecodeGenerator VisitVariableDeclaration(VariableDeclaration node)
     {
         var slot = Locals.Declare(node.Name);
-        
-        _currentClass?.Fields.Add(node.Name, (_currentClass.Fields.Count, ResolveType(node.TypeName)));
+
+        _currentClass?.Fields.Add(node.Name, new FieldInfo
+        {
+            FieldId = _currentClass.Fields.Count,
+            Type = ResolveType(node.TypeName)
+        });
         if (_currentFunction != null)
         {
             var variable = new BytecodeVariable(_program.Variables.Count, node.Name, ResolveType(node.TypeName));

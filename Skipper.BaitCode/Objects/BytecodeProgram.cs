@@ -1,4 +1,5 @@
 ﻿using Skipper.BaitCode.Types;
+using System.Text.Json.Serialization;
 
 namespace Skipper.BaitCode.Objects;
 
@@ -6,18 +7,22 @@ namespace Skipper.BaitCode.Objects;
 public sealed class BytecodeProgram
 {
     // Таблица типов
-    public List<BytecodeType> Types { get; } = [];
+    public List<BytecodeType> Types { get; set; } = [];
     // Все переменные (числа, строки, bool и т.д.)
-    public List<BytecodeVariable> Variables { get; } = [];
+    [JsonInclude]
+    public List<BytecodeVariable> Variables { get; private set; } = [];
     // Все функции программы (включая методы классов)
-    public List<BytecodeFunction> Functions { get; } = [];
+    [JsonInclude]
+    public List<BytecodeFunction> Functions { get; private set; } = [];
     // Все классы программы
-    public List<BytecodeClass> Classes { get; } = [];
+    [JsonInclude]
+    public List<BytecodeClass> Classes { get; private set; } = [];
 
     // ID функции-точки входа
     public int EntryFunctionId { get; set; }
-    
+
+    [JsonInclude]
     // Общий пул констант (числа, строки, bool, имена классов)
-    public List<object> ConstantPool { get; } = [];
+    public List<object> ConstantPool { get; private set; } = [];
 }
 
