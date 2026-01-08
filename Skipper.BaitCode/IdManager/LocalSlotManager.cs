@@ -1,13 +1,15 @@
-﻿namespace Skipper.BaitCode.IdManager;
+﻿using Skipper.BaitCode.Objects;
+using Skipper.BaitCode.Types;
+
+namespace Skipper.BaitCode.IdManager;
 
 /// <summary>
 /// Управление слотами для локальных переменных и параметров
 /// </summary>
 
-public sealed class LocalSlotManager
+public sealed class LocalSlotManager(BytecodeFunction function)
 {
     private readonly Stack<Dictionary<string, int>> _scopes = new();
-    private int _nextSlot = 0;
 
     public void EnterScope()
     {
@@ -19,32 +21,30 @@ public sealed class LocalSlotManager
         _scopes.Pop();
     }
 
-    public int Declare(string name)
+    public int Declare(string name, BytecodeType type)
     {
         var scope = _scopes.Peek();
 
         if (scope.ContainsKey(name))
             throw new InvalidOperationException($"Variable '{name}' already declared in this scope");
 
-        var slot = _nextSlot++;
+        var slot = function.Locals.Count;
+
+        function.Locals.Add(
+            new BytecodeVariable(slot, name, type)
+        );
+
         scope[name] = slot;
         return slot;
     }
 
-    public int Resolve(string name)
+    public bool TryResolve(string name, out int slot)
     {
         foreach (var scope in _scopes)
-        {
-            if (scope.TryGetValue(name, out var slot))
-                return slot;
-        }
+            if (scope.TryGetValue(name, out slot))
+                return true;
 
-        throw new InvalidOperationException($"Variable '{name}' not found");
-    }
-
-    public void Reset()
-    {
-        _scopes.Clear();
-        _nextSlot = 0;
+        slot = -1;
+        return false;
     }
 }

@@ -1,5 +1,4 @@
-﻿using System.Linq.Expressions;
-using Skipper.Lexer.Tokens;
+﻿using Skipper.Lexer.Tokens;
 using Skipper.Parser.AST;
 using Skipper.Parser.AST.Declarations;
 using Skipper.Parser.AST.Expressions;
@@ -26,6 +25,10 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
     private readonly Dictionary<string, BytecodeType> _resolvedTypes = new();
     private readonly Dictionary<string, PrimitiveType> _primitiveTypes = new();
 
+    private LocalSlotManager Locals => _locals.Peek();
+    private void EnterScope() => Locals.EnterScope();
+    private void ExitScope() => Locals.ExitScope();
+
     public BytecodeProgram Generate(ProgramNode program)
     {
         VisitProgram(program);
@@ -36,8 +39,7 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
     // Добавляет операцию в текущую обрабатываемую функцию
     private void Emit(OpCode opCode, params object[] operands)
     {
-        if (_currentFunction == null)
-            throw new InvalidOperationException("No function declared in scope");
+        if (_currentFunction == null) throw new InvalidOperationException("No function declared in scope");
 
         _currentFunction.Code.Add(new Instruction(opCode, operands));
     }
@@ -45,22 +47,15 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
     // Обход начиная с результата работы парсера AST (корневой узел)
     public BytecodeGenerator VisitProgram(ProgramNode node)
     {
-        _locals.Push(new LocalSlotManager());
-        EnterScope();
         foreach (var decl in node.Declarations)
         {
             decl.Accept(this);
         }
-        ExitScope();
-        _locals.Pop();
+        
         return this;
     }
 
-    private LocalSlotManager Locals => _locals.Peek();
-    private void EnterScope() => Locals.EnterScope();
-    private void ExitScope() => Locals.ExitScope();
-
-    // --- Declarations ---
+    // Объявление функции, её параметров, переменных, инструкций
     public BytecodeGenerator VisitFunctionDeclaration(FunctionDeclaration node)
     {
         var function = new BytecodeFunction(
@@ -68,14 +63,15 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
             name: node.Name,
             returnType: ResolveType(node.ReturnType),
             parameters: node.Parameters
-                .Select(p => (p.Name, ResolveType(p.TypeName)))
+                .Select(p => new FuncParam(p.Name, ResolveType(p.TypeName)))
                 .ToList()
         );
         
         _program.Functions.Add(function);
+        _currentClass?.Methods.Add(function.Name, function.FunctionId);
         _currentFunction = function;
         
-        _locals.Push(new LocalSlotManager());
+        _locals.Push(new LocalSlotManager(function));
         EnterScope();
         
         foreach (var param in node.Parameters)
@@ -91,34 +87,71 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
-    public BytecodeGenerator VisitParameterDeclaration(ParameterDeclaration node) // TODO: Пофиксить добавление в функцию
+    // Объявление параметров функции
+    public BytecodeGenerator VisitParameterDeclaration(ParameterDeclaration node)
     {
-        Locals.Declare(node.Name);
+        if (_currentFunction == null) throw new InvalidOperationException("Parameter outside function");
 
+        Locals.Declare(node.Name, ResolveType(node.TypeName));
         return this;
     }
 
+    /* Объявление переменных
+     * Есть 4 типа переменных:
+     *
+     * Где объявлена	    Где хранится	    Как адресуется
+     * Глобальный scope     Program.Globals	    LOAD_GLOBAL id
+     * Параметр функции	    Frame.Locals	    LOAD_LOCAL slot
+     * Локал функции        Frame.Locals	    LOAD_LOCAL slot
+     * Поле класса          Object.Fields	    GET_FIELD fieldId
+     */
     public BytecodeGenerator VisitVariableDeclaration(VariableDeclaration node)
     {
-        var slot = Locals.Declare(node.Name);
+        var type = ResolveType(node.TypeName);
         
-        _currentClass?.Fields.Add(node.Name, (_currentClass.Fields.Count, ResolveType(node.TypeName)));
+        // Глобальный scope
+        if (_currentFunction == null && _currentClass == null)
+        {
+            var id = _program.Globals.Count;
+            _program.Globals.Add(new BytecodeVariable(id, node.Name, type));
+            if (node.Initializer != null)
+            {
+                node.Initializer.Accept(this);
+                Emit(OpCode.STORE_GLOBAL, id);
+            }
+
+            return this;
+        } 
+        
+        // Локал функции
         if (_currentFunction != null)
         {
-            var variable = new BytecodeVariable(_program.Variables.Count, node.Name, ResolveType(node.TypeName));
-            _currentFunction?.Locals.Add(variable);
-            _program.Variables.Add(variable);
+            var slot = Locals.Declare(node.Name, type);
+            if (node.Initializer != null)
+            {
+                node.Initializer.Accept(this);
+                Emit(OpCode.STORE_LOCAL, _currentFunction.FunctionId, slot);
+            }
+            return this;
         }
-
-        if (node.Initializer != null)
+        
+        // Поле класса
+        if (_currentClass != null && _currentFunction == null)
         {
-            node.Initializer.Accept(this);
-            Emit(OpCode.STORE, slot);
+            _currentClass.Fields.Add(
+                node.Name,
+                new FieldInfo 
+                { 
+                    FieldId = _currentClass.Fields.Count,
+                    Type = ResolveType(node.TypeName)
+                });
+            return this;
         }
 
-        return this;
+        throw new InvalidOperationException("Invalid variable declaration context");
     }
 
+    // Объявление класса
     public BytecodeGenerator VisitClassDeclaration(ClassDeclaration node)
     {
         var cls = new BytecodeClass(
@@ -136,7 +169,7 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
-    // --- Statements ---
+    // Обход блока, создание нового скоупа
     public BytecodeGenerator VisitBlockStatement(BlockStatement node)
     {
         EnterScope();
@@ -148,6 +181,7 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
+    // Обработка выражения, после каждого выражения идёт POP, a = b, также считается выражением и возвращает b
     public BytecodeGenerator VisitExpressionStatement(ExpressionStatement node)
     {
         node.Expression.Accept(this);
@@ -155,6 +189,7 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
+    // Возврат функции
     public BytecodeGenerator VisitReturnStatement(ReturnStatement node)
     {
         node.Value?.Accept(this);
@@ -162,7 +197,8 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
-    public BytecodeGenerator VisitIfStatement(IfStatement node) // TODO: EmitPlaceholder + Patch
+    // Обход if оператора
+    public BytecodeGenerator VisitIfStatement(IfStatement node)
     {
         node.Condition.Accept(this);
 
@@ -185,26 +221,23 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
+    // Промежуточное создание байткода, пока что не известно, каким будет параметр
     private int EmitPlaceholder(OpCode opCode)
     {
-        if (_currentFunction == null)
-            throw new NullReferenceException("No function declared in scope");
+        if (_currentFunction == null) throw new NullReferenceException("No function declared in scope");
 
         var placeholderIndex = _currentFunction.Code.Count;
         Emit(opCode, 0); // 0 будет заменено позже
         return placeholderIndex;
     }
 
+    // Когда известен параметр для байткода, созданного EmitPlaceholder, этот параметр дополняется
     private void Patch(int instructionIndex)
     {
-        if (_currentFunction == null)
-            throw new NullReferenceException("No function declared in scope");
+        if (_currentFunction == null) throw new NullReferenceException("No function declared in scope");
         
         var instr = _currentFunction.Code[instructionIndex];
-        _currentFunction.Code[instructionIndex] = new Instruction(
-            instr.OpCode,
-            _currentFunction.Code.Count
-        );
+        _currentFunction.Code[instructionIndex] = new Instruction(instr.OpCode, _currentFunction.Code.Count);
     }
 
     /*
@@ -221,7 +254,7 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         JUMP -> loop_start
         (loop_end):
      */
-    public BytecodeGenerator VisitWhileStatement(WhileStatement node) // TODO
+    public BytecodeGenerator VisitWhileStatement(WhileStatement node)
     {
         // начало цикла
         if (_currentFunction == null)
@@ -272,11 +305,17 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         // initializer
         node.Initializer?.Accept(this);
 
+        
+        if (_currentFunction == null)
+        {
+            throw new NullReferenceException("No function declared in scope");
+        }
+        
         // начало цикла
-        int loopStart = _currentFunction!.Code.Count;
+        var loopStart = _currentFunction.Code.Count;
 
         // condition (если есть)
-        int jumpExit = -1;
+        var jumpExit = -1;
         if (node.Condition != null)
         {
             node.Condition.Accept(this);
@@ -304,21 +343,13 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
-    // --- Expressions ---
+    // Бинарное выражение, пример a + b или a = b
     public BytecodeGenerator VisitBinaryExpression(BinaryExpression node)
     {
         // Присваивание
         if (node.Operator.Type == TokenType.ASSIGN)
         {
-            // 1. вычисляем r-value
-            node.Right.Accept(this);
-
-            // 2. дублируем, т.к. assignment — expression
-            Emit(OpCode.DUP);
-
-            // 3. сохраняем в l-value
-            EmitStore(node.Left);
-
+            EmitAssignment(node.Left, node.Right);
             return this;
         }
         
@@ -347,53 +378,57 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
     
         return this;
     }
-    
-    private void EmitStore(Expression target)
+
+    // Создаёт байткод для операции присваивания a = b
+    private void EmitAssignment(Expression target, Expression value)
     {
         switch (target)
         {
             // x = value
             case IdentifierExpression id:
             {
-                var slot = Locals.Resolve(id.Name);
-                Emit(OpCode.STORE, slot);
-                break;
+                value.Accept(this); // stack: value
+                Emit(OpCode.DUP);   // stack: value, value
+
+                if (Locals.TryResolve(id.Name, out var slot))
+                {
+                    if (_currentFunction == null)
+                    {
+                        throw new NullReferenceException("No function declared in scope");
+                    }
+                    
+                    Emit(OpCode.STORE_LOCAL, _currentFunction.FunctionId, slot);
+                    // stack: value
+                    return;
+                }
+
+                throw new Exception($"Local '{id.Name}' not found");
             }
 
             // obj.field = value
             case MemberAccessExpression ma:
             {
+                ma.Object.Accept(this); // stack: object
+                value.Accept(this);     // stack: object, value
+                Emit(OpCode.DUP);       // stack: object, value, value
+
+                var (classId, fieldId) = ResolveField(ma);
+                Emit(OpCode.SET_FIELD, classId, fieldId);
                 // stack: value
-                // нужно: object, value
-
-                // вычисляем объект
-                ma.Object.Accept(this);
-
-                // stack: value, object
-                Emit(OpCode.SWAP);
-                // stack: object, value
-
-                var field = ResolveField(ma);
-                Emit(OpCode.SET_FIELD, field.FieldId);
-                break;
+                return;
             }
 
             // arr[index] = value
             case ArrayAccessExpression aa:
             {
-                // stack: value
-
-                aa.Target.Accept(this); // array
-                aa.Index.Accept(this);  // index
-
-                // stack: value, array, index
-                Emit(OpCode.SWAP);      // value <-> index
-                // stack: index, array, value
-                Emit(OpCode.SWAP);      // index <-> array
-                // stack: array, index, value
+                aa.Target.Accept(this);     // stack: array
+                aa.Index.Accept(this);      // stack: array, index
+                value.Accept(this);         // stack: array, index, value
+                Emit(OpCode.DUP);                 // stack: array, index, value, value
 
                 Emit(OpCode.SET_ELEMENT);
-                break;
+                // stack: value
+                return;
             }
 
             default:
@@ -402,9 +437,11 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         }
     }
 
+    // Унарное выражение, пример -a, !a
     public BytecodeGenerator VisitUnaryExpression(UnaryExpression node)
     {
         node.Operand.Accept(this);
+
         switch (node.Operator.Type)
         {
             case TokenType.NOT: Emit(OpCode.NOT); break;
@@ -416,34 +453,92 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
+    // Добавляет константу в пул и на стек
     public BytecodeGenerator VisitLiteralExpression(LiteralExpression node)
     {
-        int constId = AddConstant(node.Value);
+        var constId = _program.ConstantPool.Count;
+        _program.ConstantPool.Add(node.Value);
+
         Emit(OpCode.PUSH, constId);
+
         return this;
     }
 
+    // Загружает нужную переменную в стек
     public BytecodeGenerator VisitIdentifierExpression(IdentifierExpression node)
     {
-        var slot = Locals.Resolve(node.Name);
-        Emit(OpCode.LOAD, slot);
-        return this;
-    }
-
-    public BytecodeGenerator VisitCallExpression(CallExpression node)
-    {
-        foreach (var arg in node.Arguments)
-            arg.Accept(this);
-
-        if (node.Callee is IdentifierExpression id)
+        // Локал / Параметр функции
+        if (_currentFunction != null && Locals.TryResolve(node.Name, out var slot))
         {
-            var functionId = ResolveFunction(id.Name);
-            Emit(OpCode.CALL, functionId);
+            Emit(OpCode.LOAD_LOCAL, _currentFunction.FunctionId, slot);
+            return this;
         }
 
-        return this;
+        // Глобал
+        var global = _program.Globals.FirstOrDefault(g => g.Name == node.Name);
+        if (global != null)
+        {
+            Emit(OpCode.LOAD_GLOBAL, global.VariableId);
+            return this;
+        }
+
+        throw new InvalidOperationException($"Unknown identifier '{node.Name}'");
     }
 
+    // Вызов функции
+    public BytecodeGenerator VisitCallExpression(CallExpression node)
+    {
+        switch (node.Callee)
+        {
+            // 1. Вызов функции func()
+            /* Байткод:
+             * arg 1
+             * arg 2
+             * ...
+             * CALL functionId
+             */
+            case IdentifierExpression id:
+            {
+                // аргументы
+                foreach (var arg in node.Arguments)
+                    arg.Accept(this);
+
+                var functionId = ResolveFunction(id.Name);
+                Emit(OpCode.CALL, functionId);
+                return this;
+            }
+            // 2. Вызов метода: obj.method(...)
+            /* Байткод:
+             * obj
+             * arg 1
+             * arg 2
+             * ...
+             * CALL_METHOD classId, methodId
+             */
+            case MemberAccessExpression ma:
+            {
+                // 1. кладём объект (this)
+                ma.Object.Accept(this);
+
+                // 2. аргументы
+                foreach (var arg in node.Arguments)
+                    arg.Accept(this);
+
+                // 3. резолвим метод
+                var cls = ResolveClass(ma);
+
+                if (!cls.Methods.TryGetValue(ma.MemberName, out var methodId))
+                    throw new InvalidOperationException($"Method '{ma.MemberName}' not found in class '{cls.Name}'");
+
+                Emit(OpCode.CALL_METHOD, cls.ClassId, methodId);
+                return this;
+            }
+            default:
+                throw new InvalidOperationException("Invalid call target");
+        }
+    }
+
+    // Обход тернарного оператора
     public BytecodeGenerator VisitTernaryExpression(TernaryExpression node)
     {
         node.Condition.Accept(this);
@@ -459,6 +554,7 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
+    // Доступ к элементу массива arr[i]
     public BytecodeGenerator VisitArrayAccessExpression(ArrayAccessExpression node)
     {
         node.Target.Accept(this);
@@ -467,40 +563,25 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
+    // Доступ к полю класса a.field
     public BytecodeGenerator VisitMemberAccessExpression(MemberAccessExpression node)
     {
-        if (node.Object is not IdentifierExpression id)
-            throw new InvalidOperationException(
-                "MemberAccessExpression.Object must be IdentifierExpression");
-
-        // 1. Загружаем объект (obj)
+        // Загружаем объект
         node.Object.Accept(this);
+        
+        var cls = ResolveClass(node);
 
-        // 2. Находим переменную
-        var variable = _program.Variables.FirstOrDefault(v => v.Name == id.Name);
-        if (variable == null)
-            throw new InvalidOperationException(
-                $"Unknown variable '{id.Name}'");
-
-        // 3. Проверяем, что это класс
-        if (variable.Type is not ClassType classType)
-            throw new InvalidOperationException(
-                $"Member access on non-class variable '{id.Name}'");
-
-        // 4. Получаем класс
-        var cls = _program.Classes.First(c => c.ClassId == classType.ClassId);
-
-        // 5. Получаем поле
+        // Получаем поле
         if (!cls.Fields.TryGetValue(node.MemberName, out var field))
-            throw new InvalidOperationException(
-                $"Field '{node.MemberName}' not found in class '{cls.Name}'");
+            throw new InvalidOperationException($"Field '{node.MemberName}' not found in class '{cls.Name}'");
 
-        // 6. Генерируем байткод
-        Emit(OpCode.GET_FIELD, field.FieldId);
+        // Генерируем байткод
+        Emit(OpCode.GET_FIELD, cls.ClassId, field.FieldId);
 
         return this;
     }
 
+    // Создание нового массива на куче
     public BytecodeGenerator VisitNewArrayExpression(NewArrayExpression node)
     {
         node.SizeExpression.Accept(this);
@@ -508,14 +589,14 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return this;
     }
 
+    // Создание нового объекта на куче (в нашем случае класса)
     public BytecodeGenerator VisitNewObjectExpression(NewObjectExpression node)
     {
         foreach (var arg in node.Arguments)
             arg.Accept(this);
         
         var cls = _program.Classes.FirstOrDefault(c => c.Name == node.ClassName);
-        if (cls == null)
-            throw new InvalidOperationException($"Unknown class '{node.ClassName}'");
+        if (cls == null) throw new InvalidOperationException($"Unknown class '{node.ClassName}'");
 
         Emit(OpCode.NEW_OBJECT, cls.ClassId);
         return this;
@@ -560,21 +641,7 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return result;
     }
     
-    private BytecodeType ResolveExpressionType(Expression expr)
-    {
-        return expr switch
-        {
-            LiteralExpression l        => ResolveType(expr.GetType().Name),
-            IdentifierExpression id    => ResolveIdentifierType(id.Name),
-            ArrayAccessExpression a    => ((ArrayType)ResolveExpressionType(a.Target)).ElementType,
-            MemberAccessExpression m   => ResolveMember(m).Type,
-            CallExpression c           => ResolveCallType(c),
-            NewObjectExpression n      => ResolveType(n.ClassName),
-            NewArrayExpression a       => new ArrayType(ResolveType(a.ElementType)),
-            _ => throw new NotSupportedException($"Type resolution not supported for {expr.NodeType}")
-        };
-    }
-    
+    // Создаёт примитив или выдаёт из кэша
     private PrimitiveType GetOrCreatePrimitive(string name)
     {
         if (_primitiveTypes.TryGetValue(name, out var t))
@@ -585,115 +652,60 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         return type;
     }
 
-    private BytecodeType ResolveClassType(string name)
+    // Находит класс по имени
+    private ClassType ResolveClassType(string name)
     {
         var cls = _program.Classes.FirstOrDefault(c => c.Name == name);
         return cls == null ?
             throw new InvalidOperationException($"Unknown class type '{name}'")
             : new ClassType(cls.ClassId, cls.Name);
     }
-    
-    private BytecodeClass ResolveClass(string name)
-    {
-        var cls = _program.Classes.FirstOrDefault(c => c.Name == name);
-        return cls ?? throw new InvalidOperationException($"Unknown class type '{name}'");
-    }
 
+    // Возвращает Id функции
     private int ResolveFunction(string name)
     {
         var func = _program.Functions.FirstOrDefault(f => f.Name == name);
-        if (func == null)
-            throw new InvalidOperationException($"Function '{name}' not found");
-        return func.FunctionId;
+        return func?.FunctionId ?? throw new InvalidOperationException($"Function '{name}' not found");
+    }
+
+    // Получает информацию о поле класса
+    private (int ClassId, int FieldId) ResolveField(MemberAccessExpression node)
+    {
+        var bytecodeClass = ResolveClass(node);
+
+        // Получаем поле
+        return !bytecodeClass.Fields.TryGetValue(node.MemberName, out var field)
+            ? throw new InvalidOperationException($"Field '{node.MemberName}' not found in class '{bytecodeClass.Name}'")
+            : (bytecodeClass.ClassId, field.FieldId);
     }
     
-    private BytecodeType ResolveIdentifierType(string name)
+    // Возвращает класс, поле которого, мы хотим получить
+    private BytecodeClass ResolveClass(MemberAccessExpression node)
     {
-        if (!_resolvedTypes.TryGetValue(name, out var type))
-            throw new InvalidOperationException($"Unknown identifier '{name}'");
-
-        return type;
-    }
-
-    private BytecodeType ResolveCallType(CallExpression node)
-    {
-        switch (node.Callee)
-        {
-            case IdentifierExpression id:
-            {
-                var funcId = ResolveFunction(id.Name);
-                return _program.Functions[funcId].ReturnType;
-            }
-
-            case MemberAccessExpression member:
-            {
-                var (id, type, isField) = ResolveMember(member);
-
-                if (isField)
-                    throw new InvalidOperationException(
-                        $"'{member.MemberName}' is a field, not a method");
-
-                return type;
-            }
-
-            default:
-                throw new InvalidOperationException("Invalid call target");
-        }
-    }
-
-    private (int FieldId, BytecodeType Type) ResolveField(MemberAccessExpression node)
-    {
-        if (node.Object is not IdentifierExpression idExpr)
-        {
-            throw new InvalidOperationException("Invalid call target");
-        }
-
-        BytecodeClass? bytecodeClass = null;
+        if (node.Object is not IdentifierExpression id)
+            throw new InvalidOperationException(
+                "MemberAccessExpression.Object must be IdentifierExpression");
         
-        foreach (var v in _program.Variables)
+        // 1. Находим переменную
+        BytecodeVariable? variable;
+        if (_currentFunction != null && Locals.TryResolve(id.Name, out var slot))
         {
-            if (v.Name != idExpr.Name) continue;
-
-            if (v.Type is ClassType cls)
-            {
-                bytecodeClass = ResolveClass(cls.Name);
-            }
+            variable = _currentFunction.Locals[slot];
+        }
+        else
+        {
+            variable = _program.Globals.FirstOrDefault(v => v.Name == id.Name);
         }
         
-        return bytecodeClass != null && bytecodeClass.Fields.TryGetValue(node.MemberName, out var field)
-            ? (field.FieldId, field.Type)
-            : throw new InvalidOperationException($"Member '{node.MemberName}' not found");
-    }
-    
-    private (int Id, BytecodeType Type, bool IsField) ResolveMember(MemberAccessExpression node)
-    {
-        var objectType = ResolveExpressionType(node.Object);
+        if (variable == null) throw new InvalidOperationException($"Unknown variable '{id.Name}'");
 
-        if (objectType is not ClassType clsType)
-            throw new InvalidOperationException("Member access on non-class type");
+        // 2. Проверяем, что это класс
+        if (variable.Type is not ClassType classType)
+            throw new InvalidOperationException($"Member access on non-class variable '{id.Name}'");
 
-        var cls = _program.Classes.First(c => c.ClassId == clsType.ClassId);
-
-        if (cls.Fields.TryGetValue(node.MemberName, out var field))
-            return (field.FieldId, field.Type, true);
-
-        if (cls.Methods.TryGetValue(node.MemberName, out var methodId))
-            return (methodId, ResolveMethodReturnType(methodId), false);
-
-        throw new InvalidOperationException($"Member '{node.MemberName}' not found");
-    }
-
-    private BytecodeType ResolveMethodReturnType(int methodId)
-    {
-        if (methodId < 0 || methodId >= _program.Functions.Count)
-            throw new InvalidOperationException($"Invalid method id {methodId}");
-
-        return _program.Functions[methodId].ReturnType;
-    }
-
-    private int AddConstant(object value)
-    {
-        _program.ConstantPool.Add(value);
-        return _program.ConstantPool.Count - 1;
+        // 3. Получаем класс
+        var cls = _program.Classes.First(c => c.ClassId == classType.ClassId);
+        
+        return cls;
     }
 }

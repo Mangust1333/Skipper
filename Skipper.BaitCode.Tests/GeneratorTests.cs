@@ -26,7 +26,7 @@ public class GeneratorTests
     {
         var func = program.Functions.FirstOrDefault(f => f.Name == funcName);
         Assert.NotNull(func);
-        return func!.Code;
+        return func.Code;
     }
 
     // --- 1. Арифметика и Примитивы ---
@@ -36,7 +36,11 @@ public class GeneratorTests
     {
         // Проверка приоритета операций на уровне байткода (обратная польская запись)
         // 1 + 2 * 3 -> 1, 2, 3, MUL, ADD
-        const string code = "fn main() { return 1 + 2 * 3; }";
+        const string code = """
+                            fn main() {
+                                return 1 + 2 * 3;
+                            }
+                            """;
 
         var program = Generate(code);
         var ops = GetInstructions(program, "main").Select(i => i.OpCode).ToList();
@@ -52,7 +56,11 @@ public class GeneratorTests
     [Fact]
     public void Unary_Operators_Work()
     {
-        const string code = "fn main() { return -5; }";
+        const string code = """
+                            fn main() { 
+                                return -5;
+                            }
+                            """;
         var program = Generate(code);
         var ops = GetInstructions(program, "main").Select(i => i.OpCode).ToList();
 
@@ -88,19 +96,19 @@ public class GeneratorTests
         var program = Generate(code);
         var inst = GetInstructions(program, "main");
 
-        // 1. int x = 10 -> PUSH 10, STORE 0
-        Assert.Equal(OpCode.STORE, inst[1].OpCode);
-        var xSlot = (int)inst[1].Operands[0];
+        // 1. int x = 10 -> PUSH 0, STORE_LOCAL 0, 0 (создание с инициализацией)
+        Assert.Equal(OpCode.STORE_LOCAL, inst[1].OpCode);
+        var xSlot = (int)inst[1].Operands[1];
 
-        // 2. x = 20 -> PUSH 20, STORE 0 (тот же слот)
-        Assert.Equal(OpCode.STORE, inst[3].OpCode);
-        Assert.Equal(xSlot, inst[3].Operands[0]);
+        // 2. x = 20 -> PUSH 1, DUP, STORE_LOCAL 0, 0, POP (присваивание копированием)
+        Assert.Equal(OpCode.STORE_LOCAL, inst[4].OpCode);
+        Assert.Equal(xSlot, inst[4].Operands[1]);
 
-        // 3. int y = x -> LOAD 0, STORE 1 (новый слот)
-        Assert.Equal(OpCode.LOAD, inst[4].OpCode);
-        Assert.Equal(xSlot, inst[4].Operands[0]);
-        Assert.Equal(OpCode.STORE, inst[5].OpCode);
-        var ySlot = (int)inst[5].Operands[0];
+        // 3. int y = x -> LOAD_LOCAL 0, 0 STORE_LOCAL 0, 1 (создание с инициализацией)
+        Assert.Equal(OpCode.LOAD_LOCAL, inst[6].OpCode);
+        Assert.Equal(xSlot, inst[6].Operands[1]);
+        Assert.Equal(OpCode.STORE_LOCAL, inst[7].OpCode);
+        var ySlot = (int)inst[7].Operands[1];
 
         Assert.NotEqual(xSlot, ySlot);
     }
@@ -111,25 +119,27 @@ public class GeneratorTests
         // Проверка корректности работы менеджера слотов
         const string code = """
                             fn main() {
-                                int a = 1;
                                 {
                                     int b = 2;
                                 }
-                                int c = 3; 
+                                int b = 1;
+                                {
+                                    int b = 2;
+                                }
                             }
                             """;
         var program = Generate(code);
         var inst = GetInstructions(program, "main");
 
-        var storeOps = inst.Where(i => i.OpCode == OpCode.STORE).ToList();
+        var storeOps = inst.Where(i => i.OpCode == OpCode.STORE_LOCAL).ToList();
 
-        // a -> slot 0
+        // b -> slot 0
         // b -> slot 1
-        // c -> slot 2 (или 1, если оптимизатор слотов реализован, но в текущем коде просто инкремент)
-        // Главное, чтобы слоты были валидными числами
+        // b -> slot 2
         Assert.Equal(3, storeOps.Count);
-        Assert.True((int)storeOps[0].Operands[0] >= 0);
-        Assert.True((int)storeOps[1].Operands[0] > (int)storeOps[0].Operands[0]);
+        Assert.NotEqual(storeOps[0].Operands[1],  storeOps[1].Operands[1]);
+        Assert.NotEqual(storeOps[0].Operands[1],  storeOps[2].Operands[1]);
+        Assert.NotEqual(storeOps[1].Operands[1],  storeOps[2].Operands[1]);
     }
 
     // --- 3. Управление потоком (Control Flow) ---
@@ -139,7 +149,11 @@ public class GeneratorTests
     {
         const string code = """
                             fn main() {
-                                if (true) { return 1; } else { return 0; }
+                                if (true) {
+                                    return 1;
+                                } else {
+                                    return 0;
+                                }
                             }
                             """;
         var inst = GetInstructions(Generate(code), "main");
@@ -159,7 +173,6 @@ public class GeneratorTests
     [Fact]
     public void ControlFlow_While_GeneratesLoop()
     {
-        // Этот тест упадет, если VisitWhileStatement останется TODO
         const string code = """
                             fn main() {
                                 while (true) {
@@ -169,16 +182,16 @@ public class GeneratorTests
                             """;
         var inst = GetInstructions(Generate(code), "main");
 
-        // Ожидаем:
-        // LABEL_START:
-        // Condition...
-        // JUMP_IF_FALSE -> END
-        // Body...
-        // JUMP -> LABEL_START
-        // END:
+        /*
+         * PUSH 0
+         * JUMP_IF_FALSE 5
+         * PUSH 1
+         * STORE_LOCAL 0, 0
+         * JUMP 0
+         */
 
         Assert.Contains(inst, i => i.OpCode == OpCode.JUMP_IF_FALSE);
-        Assert.Contains(inst, i => i.OpCode == OpCode.JUMP); // Прыжок назад
+        Assert.Contains(inst, i => i.OpCode == OpCode.JUMP);
 
         // Прыжок назад должен иметь индекс меньше текущего
         var backJump = inst.Last(i => i.OpCode == OpCode.JUMP);
@@ -191,8 +204,15 @@ public class GeneratorTests
     public void ControlFlow_For_GeneratesLoop()
     {
         // Этот тест упадет, если VisitForStatement останется TODO
-        const string code = "fn main() { for(int i=0; i<10; i=i+1) {} }";
-        var inst = GetInstructions(Generate(code), "main");
+        const string code = """
+                            fn main() {
+                                for(int i=0; i<10; i=i+1) {
+                                    int x = 1;
+                                }
+                            }
+                            """;
+        var program = Generate(code);
+        var inst = GetInstructions(program, "main");
 
         Assert.Contains(inst, i => i.OpCode == OpCode.JUMP_IF_FALSE);
         Assert.Contains(inst, i => i.OpCode == OpCode.JUMP);
@@ -204,8 +224,12 @@ public class GeneratorTests
     public void Function_Call_WithArguments()
     {
         const string code = """
-                            fn sum(int a, int b) -> int { return a + b; }
-                            fn main() { sum(10, 20); }
+                            fn sum(int a, int b) -> int {
+                                return a + b;
+                            }
+                            fn main() {
+                                sum(10, 20);
+                            }
                             """;
         var program = Generate(code);
         var mainInst = GetInstructions(program, "main");
@@ -218,11 +242,11 @@ public class GeneratorTests
 
         // Проверяем аргументы внутри sum
         var sumInst = GetInstructions(program, "sum");
-        // LOAD 0 (a), LOAD 1 (b)
-        var loads = sumInst.Where(i => i.OpCode == OpCode.LOAD).ToList();
+        // LOAD_LOCAL 0, 0; LOAD_LOCAL 0, 1
+        var loads = sumInst.Where(i => i.OpCode == OpCode.LOAD_LOCAL).ToList();
         Assert.True(loads.Count >= 2);
-        Assert.Equal(0, loads[0].Operands[0]);
-        Assert.Equal(1, loads[1].Operands[0]);
+        Assert.Equal(0, loads[0].Operands[1]);
+        Assert.Equal(1, loads[1].Operands[1]);
     }
 
     // --- 5. Классы и Объекты (OOP) ---
@@ -252,6 +276,10 @@ public class GeneratorTests
                                 Box b = new Box();
                                 b.val = 55;   // SET_FIELD
                                 int x = b.val; // GET_FIELD
+                                int a = 15;
+                                int l = 18;
+                                int c = 13;
+                                a = l = c;
                             }
                             """;
         var program = Generate(code);
@@ -278,5 +306,27 @@ public class GeneratorTests
         Assert.Contains(inst, i => i.OpCode == OpCode.NEW_ARRAY);
         Assert.Contains(inst, i => i.OpCode == OpCode.SET_ELEMENT);
         Assert.Contains(inst, i => i.OpCode == OpCode.GET_ELEMENT);
+    }
+    
+    
+    [Fact]
+    public void Class_MethodAccess_TryAccess()
+    {
+        const string code = """
+                            class Box { 
+                                fn sum(int a, int b) -> int { 
+                                    return a + b;
+                                }
+                            }
+
+                            fn main() {
+                                Box b = new Box();
+                                b.sum(1, 2);
+                            }
+                            """;
+        var program = Generate(code);
+        var inst = GetInstructions(program, "main");
+
+        Assert.Contains(inst, i => i.OpCode == OpCode.CALL_METHOD);
     }
 }
