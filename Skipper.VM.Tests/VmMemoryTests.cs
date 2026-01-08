@@ -34,7 +34,7 @@ public class VmMemoryTests
         Value result = vm.Run("main");
 
         Assert.Equal(ValueKind.ObjectRef, result.Kind);
-        Assert.NotEqual(0, result.AsObject()); // Указатель валиден
+        Assert.NotEqual(0, result.AsObject());
     }
 
     [Fact]
@@ -45,13 +45,18 @@ public class VmMemoryTests
         program.ConstantPool.Add(5);
 
         // Функция add(a, b) { return a + b }
-        BytecodeFunction addFunc = new(1, "add", null!, [])
+        var paramsAdd = new List<FuncParam>
         {
-            ParameterTypes = [("a", null!), ("b", null!)],
+            new() { Name = "a" },
+            new() { Name = "b" }
+        };
+
+        BytecodeFunction addFunc = new(1, "add", null!, paramsAdd)
+        {
             Code =
             [
-                new Instruction(OpCode.LOAD, 0), // a
-                new Instruction(OpCode.LOAD, 1), // b
+                new Instruction(OpCode.LOAD_LOCAL, 1, 0), // a (funcId=1, slot=0)
+                new Instruction(OpCode.LOAD_LOCAL, 1, 1), // b (funcId=1, slot=1)
                 new Instruction(OpCode.ADD),
                 new Instruction(OpCode.RETURN)
             ]
@@ -85,11 +90,11 @@ public class VmMemoryTests
         program.Classes.Add(new BytecodeClass(0, "Temp"));
 
         List<Instruction> code =
-        [
-            new Instruction(OpCode.NEW_OBJECT, 0), // Выделение памяти
-            new Instruction(OpCode.POP),           // Удаление ссылки со стека
-            new Instruction(OpCode.RETURN)
-        ];
+    [
+        new Instruction(OpCode.NEW_OBJECT, 0),
+        new Instruction(OpCode.POP),
+        new Instruction(OpCode.RETURN)
+    ];
 
         BytecodeFunction func = new(0, "main", null!, []) { Code = code };
         program.Functions.Add(func);
@@ -99,10 +104,8 @@ public class VmMemoryTests
 
         _ = vm.Run("main");
 
-        // Ручной запуск сборщика мусора
         runtime.Collect(vm);
 
-        // Проверка состояния кучи (требует доступа к внутренним свойствам RuntimeContext)
-        // Assert.Empty(runtime.Heap.Objects); 
+        Assert.Equal(0, runtime.GetAliveObjectCount());
     }
 }

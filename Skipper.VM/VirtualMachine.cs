@@ -11,14 +11,13 @@ public sealed class VirtualMachine : IRootProvider
     private readonly RuntimeContext _runtime;
     private readonly BytecodeProgram _program;
 
-    // Стек вызовов функций
+    // Стек вызовов
     private readonly Stack<StackFrame> _callStack = new();
-
     // Глобальный стек операндов
     private readonly Stack<Value> _evalStack = new();
 
-    // Регистры виртуальной машины
-    private int _ip; // Instruction Pointer
+    // Регистры VM
+    private int _ip;
     private BytecodeFunction? _currentFunc;
     private Value[]? _currentLocals;
 
@@ -28,41 +27,36 @@ public sealed class VirtualMachine : IRootProvider
         _runtime = runtime;
     }
 
-    /// <summary>
-    /// Запускает выполнение программы с указанной точки входа.
-    /// </summary>
     public Value Run(string entryPointName)
     {
         BytecodeFunction? mainFunc = _program.Functions.FirstOrDefault(f => f.Name == entryPointName);
         if (mainFunc == null)
         {
-            throw new InvalidOperationException($"Function '{entryPointName}' not found.");
+            throw new InvalidOperationException($"Function '{entryPointName}' not found");
         }
 
-        // Инициализируем первый фрейм
         PushFrame(mainFunc, -1);
 
         try
         {
-            // Главный цикл интерпретации
             while (_currentFunc != null && _ip < _currentFunc.Code.Count)
             {
+                Console.WriteLine($"[STEP] Func: {_currentFunc.Name}, IP: {_ip} (Total: {_currentFunc.Code.Count}), Op: {_currentFunc.Code[_ip].OpCode}");
+
                 Instruction instr = _currentFunc.Code[_ip];
                 Execute(instr);
 
-                // Если стек вызовов пуст, значит вышли из Main
                 if (_callStack.Count == 0)
                 {
                     break;
                 }
             }
-        } catch (Exception)
+        } catch (Exception ex)
         {
-            Console.WriteLine($"[VM Runtime Error] Func: {_currentFunc?.Name}, IP: {_ip}, Op: {_currentFunc?.Code[_ip].OpCode}");
-            throw; // Пробрасываем ошибку дальше для тестов/отладки
+            Console.WriteLine($"[VM Runtime Error] Func: {_currentFunc?.Name}, IP: {_ip}, Op: {_currentFunc?.Code[_ip].OpCode}. Error: {ex.Message}");
+            throw;
         }
 
-        // Возвращаем результат (если есть)
         return _evalStack.Count > 0 ? _evalStack.Pop() : Value.Null();
     }
 
@@ -79,11 +73,15 @@ public sealed class VirtualMachine : IRootProvider
                 var val = _program.ConstantPool[constIdx];
                 _evalStack.Push(ValueFromConst(val));
                 _ip++;
+                break;
             }
-            break;
 
             case OpCode.POP:
-                _ = _evalStack.Pop();
+                if (_evalStack.Count > 0)
+                {
+                    _ = _evalStack.Pop();
+                }
+
                 _ip++;
                 break;
 
@@ -93,29 +91,28 @@ public sealed class VirtualMachine : IRootProvider
                 break;
 
             case OpCode.SWAP:
-            {
                 Value top = _evalStack.Pop();
                 Value below = _evalStack.Pop();
                 _evalStack.Push(top);
                 _evalStack.Push(below);
                 _ip++;
-            }
-            break;
+                break;
 
             // ===========================
             // Локальные переменные
             // ===========================
-            case OpCode.LOAD:
+            case OpCode.LOAD_LOCAL:
             {
-                var slot = Convert.ToInt32(instr.Operands[0]);
+                // [funcId, slot] -> нужен только slot
+                var slot = Convert.ToInt32(instr.Operands[1]);
                 _evalStack.Push(_currentLocals![slot]);
                 _ip++;
             }
             break;
 
-            case OpCode.STORE:
+            case OpCode.STORE_LOCAL:
             {
-                var slot = Convert.ToInt32(instr.Operands[0]);
+                var slot = Convert.ToInt32(instr.Operands[1]);
                 _currentLocals![slot] = _evalStack.Pop();
                 _ip++;
             }
@@ -126,63 +123,63 @@ public sealed class VirtualMachine : IRootProvider
             // ===========================
             case OpCode.ADD:
             {
-                var b = _evalStack.Pop().Raw;
-                var a = _evalStack.Pop().Raw;
-                _evalStack.Push(Value.FromInt((int)(a + b)));
+                var b = _evalStack.Pop().AsInt();
+                var a = _evalStack.Pop().AsInt();
+                _evalStack.Push(Value.FromInt(a + b));
                 _ip++;
             }
             break;
 
             case OpCode.SUB:
             {
-                var b = _evalStack.Pop().Raw;
-                var a = _evalStack.Pop().Raw;
-                _evalStack.Push(Value.FromInt((int)(a - b)));
+                var b = _evalStack.Pop().AsInt();
+                var a = _evalStack.Pop().AsInt();
+                _evalStack.Push(Value.FromInt(a - b));
                 _ip++;
             }
             break;
 
             case OpCode.MUL:
             {
-                var b = _evalStack.Pop().Raw;
-                var a = _evalStack.Pop().Raw;
-                _evalStack.Push(Value.FromInt((int)(a * b)));
+                var b = _evalStack.Pop().AsInt();
+                var a = _evalStack.Pop().AsInt();
+                _evalStack.Push(Value.FromInt(a * b));
                 _ip++;
             }
             break;
 
             case OpCode.DIV:
             {
-                var b = _evalStack.Pop().Raw;
+                var b = _evalStack.Pop().AsInt();
                 if (b == 0)
                 {
                     throw new DivideByZeroException();
                 }
 
-                var a = _evalStack.Pop().Raw;
-                _evalStack.Push(Value.FromInt((int)(a / b)));
+                var a = _evalStack.Pop().AsInt();
+                _evalStack.Push(Value.FromInt(a / b));
                 _ip++;
             }
             break;
 
             case OpCode.MOD:
             {
-                var b = _evalStack.Pop().Raw;
+                var b = _evalStack.Pop().AsInt();
                 if (b == 0)
                 {
                     throw new DivideByZeroException();
                 }
 
-                var a = _evalStack.Pop().Raw;
-                _evalStack.Push(Value.FromInt((int)(a % b)));
+                var a = _evalStack.Pop().AsInt();
+                _evalStack.Push(Value.FromInt(a % b));
                 _ip++;
             }
             break;
 
             case OpCode.NEG:
             {
-                var a = _evalStack.Pop().Raw;
-                _evalStack.Push(Value.FromInt((int)-a));
+                var a = _evalStack.Pop().AsInt();
+                _evalStack.Push(Value.FromInt(-a));
                 _ip++;
             }
             break;
@@ -208,32 +205,32 @@ public sealed class VirtualMachine : IRootProvider
             break;
             case OpCode.CMP_LT:
             {
-                var b = _evalStack.Pop().Raw;
-                var a = _evalStack.Pop().Raw;
+                var b = _evalStack.Pop().AsInt();
+                var a = _evalStack.Pop().AsInt();
                 _evalStack.Push(Value.FromBool(a < b));
                 _ip++;
             }
             break;
             case OpCode.CMP_GT:
             {
-                var b = _evalStack.Pop().Raw;
-                var a = _evalStack.Pop().Raw;
+                var b = _evalStack.Pop().AsInt();
+                var a = _evalStack.Pop().AsInt();
                 _evalStack.Push(Value.FromBool(a > b));
                 _ip++;
             }
             break;
             case OpCode.CMP_LE:
             {
-                var b = _evalStack.Pop().Raw;
-                var a = _evalStack.Pop().Raw;
+                var b = _evalStack.Pop().AsInt();
+                var a = _evalStack.Pop().AsInt();
                 _evalStack.Push(Value.FromBool(a <= b));
                 _ip++;
             }
             break;
             case OpCode.CMP_GE:
             {
-                var b = _evalStack.Pop().Raw;
-                var a = _evalStack.Pop().Raw;
+                var b = _evalStack.Pop().AsInt();
+                var a = _evalStack.Pop().AsInt();
                 _evalStack.Push(Value.FromBool(a >= b));
                 _ip++;
             }
@@ -302,14 +299,12 @@ public sealed class VirtualMachine : IRootProvider
             case OpCode.CALL:
             {
                 var funcId = Convert.ToInt32(instr.Operands[0]);
-                // Operand[1] usually is arg_count, but we can get it from func definition too
                 BytecodeFunction? target = _program.Functions.FirstOrDefault(f => f.FunctionId == funcId);
                 if (target == null)
                 {
                     throw new InvalidOperationException($"Func ID {funcId} not found");
                 }
 
-                // Сохраняем возврат на следующую инструкцию
                 PushFrame(target, _ip + 1);
             }
             break;
@@ -319,7 +314,7 @@ public sealed class VirtualMachine : IRootProvider
                 break;
 
             // ===========================
-            // Объекты
+            // Объекты (Память)
             // ===========================
             case OpCode.NEW_OBJECT:
             {
@@ -351,10 +346,11 @@ public sealed class VirtualMachine : IRootProvider
 
             case OpCode.GET_FIELD:
             {
-                var fieldIdx = Convert.ToInt32(instr.Operands[0]);
+                var fieldIdx = Convert.ToInt32(instr.Operands[1]);
                 Value objRef = _evalStack.Pop();
                 CheckNull(objRef);
 
+                // Используем RuntimeContext для безопасного чтения (с учетом Header)
                 Value val = _runtime.ReadField(objRef.AsObject(), fieldIdx);
                 _evalStack.Push(val);
                 _ip++;
@@ -363,9 +359,9 @@ public sealed class VirtualMachine : IRootProvider
 
             case OpCode.SET_FIELD:
             {
-                var fieldIdx = Convert.ToInt32(instr.Operands[0]);
+                var fieldIdx = Convert.ToInt32(instr.Operands[1]);
                 Value val = _evalStack.Pop();
-                Value objRef = _evalStack.Pop();
+                Value objRef = _evalStack.Pop(); // Object is below value on stack
                 CheckNull(objRef);
 
                 _runtime.WriteField(objRef.AsObject(), fieldIdx, val);
@@ -427,81 +423,45 @@ public sealed class VirtualMachine : IRootProvider
                 _ip++;
             }
             break;
-
-            case OpCode.ARRAY_LENGTH:
-            {
-                Value arrRef = _evalStack.Pop();
-                CheckNull(arrRef);
-                var len = _runtime.GetArrayLength(arrRef.AsObject());
-                _evalStack.Push(Value.FromInt(len));
-                _ip++;
-            }
-            break;
-
-            // ===========================
-            // IO / Debug
-            // ===========================
-            case OpCode.PRINT:
-            {
-                Value val = _evalStack.Pop();
-                // Выводим значение. Если объект - выводим адрес или тип.
-                var output = val.Kind == ValueKind.ObjectRef
-                        ? $"[Object Ref: 0x{val.Raw:X}]"
-                        : val.ToString();
-
-                Console.WriteLine(output);
-                _ip++;
-            }
-            break;
-
-            default:
-                throw new NotImplementedException($"OpCode {instr.OpCode} not implemented.");
         }
     }
 
-    // --- Управление стеком фреймов ---
-
     private void PushFrame(BytecodeFunction func, int returnAddress)
     {
-        StackFrame frame = new(func, returnAddress);
-
-        // Аргументы лежат на стеке в обратном порядке (последний аргумент на вершине)
+        var frame = new StackFrame(func, returnAddress);
         var argCount = func.ParameterTypes.Count;
         for (var i = argCount - 1; i >= 0; i--)
         {
             if (_evalStack.Count == 0)
             {
-                throw new InvalidOperationException("Not enough arguments on stack");
+                throw new InvalidOperationException("Stack underflow on args");
             }
 
             frame.Locals[i] = _evalStack.Pop();
         }
-
         _callStack.Push(frame);
         _currentFunc = func;
         _currentLocals = frame.Locals;
-        _ip = 0; // В новой функции начинаем с 0
+        _ip = 0;
     }
 
     private void PopFrame()
     {
-        StackFrame endingFrame = _callStack.Pop();
+        StackFrame poppedFrame = _callStack.Pop();
 
         if (_callStack.Count > 0)
         {
-            StackFrame parent = _callStack.Peek();
-            _currentFunc = parent.Function;
-            _currentLocals = parent.Locals;
-            _ip = endingFrame.ReturnAddress;
+            StackFrame parentFrame = _callStack.Peek();
+            _currentFunc = parentFrame.Function;
+            _currentLocals = parentFrame.Locals;
+            _ip = poppedFrame.ReturnAddress;
         } else
         {
-            // Программа завершилась
             _currentFunc = null;
             _currentLocals = null;
+            _ip = 0;
         }
     }
-
-    // --- Вспомогательные методы ---
 
     private void CheckNull(Value refVal)
     {
@@ -520,16 +480,12 @@ public sealed class VirtualMachine : IRootProvider
             double d => Value.FromDouble(d),
             bool b => Value.FromBool(b),
             char ch => Value.FromChar(ch),
-            string => throw new NotImplementedException("String constants require intern pool implementation"),
             _ => throw new NotImplementedException($"Const type {c.GetType()} not supported")
         };
     }
 
-    // --- GC Interface (IRootProvider) ---
-
     public IEnumerable<nint> EnumerateRoots()
     {
-        // 1. Корни со стека операндов
         foreach (Value val in _evalStack)
         {
             if (val.Kind == ValueKind.ObjectRef && val.Raw != 0)
@@ -538,12 +494,10 @@ public sealed class VirtualMachine : IRootProvider
             }
         }
 
-        // 2. Корни из локальных переменных всех активных фреймов
         foreach (StackFrame frame in _callStack)
         {
             foreach (Value local in frame.Locals)
             {
-                // Проверяем, является ли локальная переменная ссылкой
                 if (local.Kind == ValueKind.ObjectRef && local.Raw != 0)
                 {
                     yield return (nint)local.Raw;

@@ -112,4 +112,6 @@ public sealed class RuntimeContext
         var offset = HeaderSize + (index * SlotSize);
         _heap.WriteInt64(arrPtr, offset, val.Raw);
     }
+
+    public int GetAliveObjectCount() => _heap.Objects.Count;
 }

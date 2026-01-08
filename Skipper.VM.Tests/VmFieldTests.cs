@@ -1,5 +1,6 @@
 ﻿using Skipper.BaitCode.Objects;
 using Skipper.BaitCode.Objects.Instructions;
+using Skipper.BaitCode.Types;
 using Skipper.Runtime;
 using Skipper.Runtime.Values;
 using Xunit;
@@ -16,8 +17,8 @@ public class VmFieldTests
         BytecodeProgram program = new();
         BytecodeClass cls = new(0, "Point");
 
-        cls.Fields.Add("x", (0, null!));
-        cls.Fields.Add("y", (1, null!));
+        cls.Fields.Add("x", new FieldInfo { FieldId = 0, Type = new PrimitiveType("int") });
+        cls.Fields.Add("y", new FieldInfo { FieldId = 1, Type = new PrimitiveType("int") });
 
         program.Classes.Add(cls);
 
@@ -29,27 +30,27 @@ public class VmFieldTests
             Code =
             [
                 // p = new Point()
-                new Instruction(OpCode.NEW_OBJECT, 0),
-                new Instruction(OpCode.STORE, 0),
+                new Instruction(OpCode.NEW_OBJECT, 0),     // Stack: [ref]
+                new Instruction(OpCode.STORE_LOCAL, 0, 0), // Locals[0] = ref
 
-                // p.x = 10 (Используем индекс 0, который мы задали выше для "x")
-                new Instruction(OpCode.LOAD, 0),       // Ref
-                new Instruction(OpCode.PUSH, 0),       // 10
-                new Instruction(OpCode.SET_FIELD, 0),  // Field idx 0
+                // p.x = 10
+                new Instruction(OpCode.LOAD_LOCAL, 0, 0),  // [ref]
+                new Instruction(OpCode.PUSH, 0),           // [ref, 10]
+                new Instruction(OpCode.SET_FIELD, 0, 0),   // [classId=0, fieldIdx=0] -> p.x = 10
 
-                // p.y = 20 (Используем индекс 1 для "y")
-                new Instruction(OpCode.LOAD, 0),       // Ref
-                new Instruction(OpCode.PUSH, 1),       // 20
-                new Instruction(OpCode.SET_FIELD, 1),  // Field idx 1
+                // p.y = 20
+                new Instruction(OpCode.LOAD_LOCAL, 0, 0),  // [ref]
+                new Instruction(OpCode.PUSH, 1),           // [ref, 20]
+                new Instruction(OpCode.SET_FIELD, 0, 1),   // [classId=0, fieldIdx=1] -> p.y = 20
 
                 // Calc p.x + p.y
-                new Instruction(OpCode.LOAD, 0),
-                new Instruction(OpCode.GET_FIELD, 0),  // Читаем idx 0
+                new Instruction(OpCode.LOAD_LOCAL, 0, 0),  // [ref]
+                new Instruction(OpCode.GET_FIELD, 0, 0),   // [10]
                 
-                new Instruction(OpCode.LOAD, 0),
-                new Instruction(OpCode.GET_FIELD, 1),  // Читаем idx 1
+                new Instruction(OpCode.LOAD_LOCAL, 0, 0),  // [ref] (стек был [10, ref])
+                new Instruction(OpCode.GET_FIELD, 0, 1),   // [10, 20]
 
-                new Instruction(OpCode.ADD),
+                new Instruction(OpCode.ADD),               // [30]
                 new Instruction(OpCode.RETURN)
             ]
         };

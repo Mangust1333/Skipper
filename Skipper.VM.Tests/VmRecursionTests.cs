@@ -20,39 +20,38 @@ public class VmRecursionTests
         program.ConstantPool.Add(1); // Index 0
         program.ConstantPool.Add(5); // Index 1
 
-        BytecodeFunction factFunc = new(0, "fact", null!, [])
+        var paramsFact = new List<FuncParam> { new() { Name = "n" } };
+
+        BytecodeFunction factFunc = new(0, "fact", null!, paramsFact)
         {
-            // Аргумент 'n' будет в Locals[0]
-            ParameterTypes = [("n", null!)],
             Code =
             [
-                new Instruction(OpCode.LOAD, 0),          // 0: Загрузить n
-                new Instruction(OpCode.PUSH, 0),          // 1: Загрузить 1
-                new Instruction(OpCode.CMP_LE),           // 2: n <= 1 ?
-                new Instruction(OpCode.JUMP_IF_FALSE, 6), // 3: Если ложь, прыгаем на индекс 6
+                new Instruction(OpCode.LOAD_LOCAL, 0, 0),  // 0: n
+                new Instruction(OpCode.PUSH, 0),           // 1: 1
+                new Instruction(OpCode.CMP_LE),            // 2: n <= 1
+                new Instruction(OpCode.JUMP_IF_FALSE, 6),  // 3: else -> 6
 
-                // Блок if: return 1
-                new Instruction(OpCode.PUSH, 0),          // 4: 1
-                new Instruction(OpCode.RETURN),           // 5: return
+                // if
+                new Instruction(OpCode.PUSH, 0),           // 4: 1
+                new Instruction(OpCode.RETURN),            // 5
 
-                // Блок else: return n * fact(n-1)
-                new Instruction(OpCode.LOAD, 0),          // 6: n
-                new Instruction(OpCode.LOAD, 0),          // 7: n
-                new Instruction(OpCode.PUSH, 0),          // 8: 1
-                new Instruction(OpCode.SUB),              // 9: n - 1
-                new Instruction(OpCode.CALL, 0),          // 10: fact(n-1)
-                new Instruction(OpCode.MUL),              // 11: n * result
-                new Instruction(OpCode.RETURN)            // 12: return
+                // else
+                new Instruction(OpCode.LOAD_LOCAL, 0, 0),  // 6: n
+                new Instruction(OpCode.LOAD_LOCAL, 0, 0),  // 7: n
+                new Instruction(OpCode.PUSH, 0),           // 8: 1
+                new Instruction(OpCode.SUB),               // 9: n-1
+                new Instruction(OpCode.CALL, 0),           // 10: fact(n-1)
+                new Instruction(OpCode.MUL),               // 11
+                new Instruction(OpCode.RETURN)             // 12
             ]
         };
 
-        // Main вызывает fact(5)
         BytecodeFunction mainFunc = new(1, "main", null!, [])
         {
             Code =
             [
-                 new Instruction(OpCode.PUSH, 1), // Загрузить 5
-                 new Instruction(OpCode.CALL, 0), // Вызов fact
+                 new Instruction(OpCode.PUSH, 1), // 5
+                 new Instruction(OpCode.CALL, 0), // fact(5)
                  new Instruction(OpCode.RETURN)
             ]
         };

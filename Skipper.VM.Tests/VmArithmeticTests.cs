@@ -16,6 +16,7 @@ public class VmArithmeticTests
             program.ConstantPool.AddRange(constants);
         }
 
+        // Функция main с ID 0
         BytecodeFunction func = new(0, "main", null!, [])
         {
             Code = code
@@ -78,7 +79,7 @@ public class VmArithmeticTests
 
         Value result = vm.Run("main");
 
-        Assert.Equal(1, result.Raw); // true это 1
+        Assert.True(result.AsBool());
     }
 
     [Fact]
@@ -87,11 +88,11 @@ public class VmArithmeticTests
         // x = 42; return x;
         List<Instruction> code =
         [
-            new Instruction(OpCode.PUSH, 0),  // [42]
-            new Instruction(OpCode.STORE, 0), // Locals[0] = 42
-            new Instruction(OpCode.PUSH, 1),  // Мусор для теста
-            new Instruction(OpCode.POP),      // Очистка мусора
-            new Instruction(OpCode.LOAD, 0),  // Загрузка Locals[0]
+            new Instruction(OpCode.PUSH, 0),           // [42]
+            new Instruction(OpCode.STORE_LOCAL, 0, 0), // Locals[0] = 42 (funcId 0, slot 0)
+            new Instruction(OpCode.PUSH, 1),           // Мусор
+            new Instruction(OpCode.POP),               // Очистка
+            new Instruction(OpCode.LOAD_LOCAL, 0, 0),  // Загрузка Locals[0]
             new Instruction(OpCode.RETURN)
         ];
         VirtualMachine vm = CreateVm(code, [42, 99]);
@@ -108,11 +109,11 @@ public class VmArithmeticTests
         List<Instruction> code =
         [
             new Instruction(OpCode.PUSH, 0),          // false
-            new Instruction(OpCode.JUMP_IF_FALSE, 4), // Прыжок на 4
+            new Instruction(OpCode.JUMP_IF_FALSE, 4), // Прыжок на 4 (если false)
             new Instruction(OpCode.PUSH, 1),          // 100
-            new Instruction(OpCode.RETURN),
+            new Instruction(OpCode.RETURN),           // (3)
             new Instruction(OpCode.PUSH, 2),          // 200 (индекс 4)
-            new Instruction(OpCode.RETURN)
+            new Instruction(OpCode.RETURN)            // (5)
         ];
         VirtualMachine vm = CreateVm(code, [false, 100, 200]);
 
