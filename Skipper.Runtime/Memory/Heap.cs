@@ -6,7 +6,7 @@ public sealed class Heap
 {
     private readonly List<HeapObject> _objects = [];
 
-    public IEnumerable<HeapObject> Objects => _objects;
+    public IReadOnlyList<HeapObject> Objects => _objects;
 
     public unsafe nint Allocate(ObjectDescriptor descriptor, int size)
     {
