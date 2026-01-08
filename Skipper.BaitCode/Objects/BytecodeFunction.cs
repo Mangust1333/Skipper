@@ -1,24 +1,50 @@
-﻿using Skipper.BaitCode.Objects.Instructions;
+﻿using System.Text.Json.Serialization;
+using Skipper.BaitCode.Objects.Instructions;
 using Skipper.BaitCode.Types;
 
 namespace Skipper.BaitCode.Objects;
 
-public class BytecodeFunction(
-    int id,
-    string name,
-    BytecodeType returnType,
-    List<(string Names, BytecodeType Type)> parameters)
+public class BytecodeFunction
 {
+
     // Id, также может содержаться и в классах
-    public int FunctionId { get; set; } = id;
+    public int FunctionId { get; set; }
     // Название функции
-    public string Name { get; set; } = name;
+    public string Name { get; set; } = string.Empty;
 
     // Сигнатура
-    public BytecodeType ReturnType { get; set; } = returnType;
-    public List<(string Names, BytecodeType Type)> ParameterTypes { get; set; } = parameters;
+    public BytecodeType ReturnType { get; set; }
+    public List<FuncParam> ParameterTypes { get; set; }
 
     // Конкретные инструкции
     public List<Instruction> Code { get; set; } = [];
-    public List<BytecodeVariable> Locals { get; } = [];
+    [JsonInclude]
+    public List<BytecodeVariable> Locals { get; private set; } = [];
+
+    public BytecodeFunction() { }
+    
+    public BytecodeFunction(int id,
+        string name,
+        BytecodeType returnType,
+        List<FuncParam> parameters)
+    {
+        FunctionId = id;
+        Name = name;
+        ReturnType = returnType;
+        ParameterTypes = parameters;
+    }
+}
+
+public class FuncParam
+{
+    public string Name { get; set; } = string.Empty;
+    public BytecodeType Type { get; set; } = default!;
+
+    public FuncParam() { }
+
+    public FuncParam(string name, BytecodeType type)
+    {
+        Name = name;
+        Type = type;
+    }
 }

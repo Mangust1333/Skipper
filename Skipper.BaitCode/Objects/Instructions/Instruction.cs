@@ -1,9 +1,21 @@
-﻿namespace Skipper.BaitCode.Objects.Instructions;
+﻿using System.Text.Json.Serialization;
 
-public sealed class Instruction(OpCode opCode, params object[] operands)
+namespace Skipper.BaitCode.Objects.Instructions;
+
+public sealed class Instruction
 {
-    public OpCode OpCode { get; } = opCode;
-    public IReadOnlyList<object> Operands { get; } = operands;
+    public OpCode OpCode { get; set; }
+    [JsonInclude]
+    public IReadOnlyList<object> Operands { get; set; }
+
+    [JsonConstructor]
+    public Instruction() { }
+
+    public Instruction(OpCode opCode, params object[] operands)
+    {
+        OpCode = opCode;
+        Operands = new List<object>(operands);
+    }
 
     public override string ToString()
     {

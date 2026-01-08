@@ -72,4 +72,34 @@ public class DeclarationTests
         var func = Assert.IsType<FunctionDeclaration>(program.Declarations[0]);
         Assert.Equal("int[][]", func.Parameters[0].TypeName);
     }
+
+    [Fact]
+    public void Parse_Function_NoParameters_VoidReturn()
+    {
+        // Arrange
+        const string source = "fn run() { }";
+
+        // Act
+        var program = TestHelpers.Parse(source);
+        var func = (FunctionDeclaration)program.Declarations[0];
+
+        // Assert
+        Assert.Equal("run", func.Name);
+        Assert.Equal("void", func.ReturnType); // Предполагаем дефолт void, если парсер это ставит
+        Assert.Empty(func.Parameters);
+    }
+
+    [Fact]
+    public void Parse_Function_ReturningArray()
+    {
+        // Arrange
+        const string source = "fn getMatrix() -> int[][] { }";
+
+        // Act
+        var program = TestHelpers.Parse(source);
+        var func = (FunctionDeclaration)program.Declarations[0];
+
+        // Assert
+        Assert.Equal("int[][]", func.ReturnType);
+    }
 }

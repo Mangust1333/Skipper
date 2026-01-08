@@ -88,4 +88,38 @@ public class ErrorTests
         Assert.True(parserResult.HasErrors);
         Assert.NotEmpty(parserResult.Diagnostics);
     }
+
+    [Fact]
+    public void Parse_MalformedFunction_MissingArrowType()
+    {
+        // fn test() -> { }  (Забыли тип после стрелки)
+
+        // Arrange
+        const string source = "fn test() -> { }";
+
+        // Act
+        var parser = new Parser.Parser(new Lexer.Lexer.Lexer(source).Tokenize());
+        var result = parser.Parse();
+
+        // Assert
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics, d => d.Message.Contains("Expected type name"));
+    }
+
+    [Fact]
+    public void Parse_MalformedArray_MissingClosingBracket()
+    {
+        // x = a[1;
+
+        // Arrange
+        const string source = "fn main() { x = a[1; }";
+
+        // Act
+        var parser = new Parser.Parser(new Lexer.Lexer.Lexer(source).Tokenize());
+        var result = parser.Parse();
+
+        // Assert
+        Assert.True(result.HasErrors);
+        Assert.Contains(result.Diagnostics, d => d.Message.Contains("Expected ']'"));
+    }
 }
