@@ -7,28 +7,6 @@ namespace Skipper.BaitCode.Tests;
 
 public class GeneratorTests
 {
-    // Хелпер для генерации
-    private static BytecodeProgram Generate(string source)
-    {
-        var lexer = new Lexer.Lexer.Lexer(source);
-        var tokens = lexer.Tokenize();
-        var parser = new Parser.Parser.Parser(tokens);
-        var result = parser.Parse();
-
-        if (result.HasErrors)
-            throw new Exception($"Parser errors: {string.Join(", ", result.Diagnostics.Select(d => d.Message))}");
-
-        var generator = new BytecodeGenerator();
-        return generator.Generate(result.Root);
-    }
-
-    private static List<Instruction> GetInstructions(BytecodeProgram program, string funcName)
-    {
-        var func = program.Functions.FirstOrDefault(f => f.Name == funcName);
-        Assert.NotNull(func);
-        return func.Code;
-    }
-
     // --- 1. Арифметика и Примитивы ---
 
     [Fact]
@@ -137,9 +115,9 @@ public class GeneratorTests
         // b -> slot 1
         // b -> slot 2
         Assert.Equal(3, storeOps.Count);
-        Assert.NotEqual(storeOps[0].Operands[1],  storeOps[1].Operands[1]);
-        Assert.NotEqual(storeOps[0].Operands[1],  storeOps[2].Operands[1]);
-        Assert.NotEqual(storeOps[1].Operands[1],  storeOps[2].Operands[1]);
+        Assert.NotEqual(storeOps[0].Operands[1], storeOps[1].Operands[1]);
+        Assert.NotEqual(storeOps[0].Operands[1], storeOps[2].Operands[1]);
+        Assert.NotEqual(storeOps[1].Operands[1], storeOps[2].Operands[1]);
     }
 
     // --- 3. Управление потоком (Control Flow) ---
@@ -307,8 +285,7 @@ public class GeneratorTests
         Assert.Contains(inst, i => i.OpCode == OpCode.SET_ELEMENT);
         Assert.Contains(inst, i => i.OpCode == OpCode.GET_ELEMENT);
     }
-    
-    
+
     [Fact]
     public void Class_MethodAccess_TryAccess()
     {
@@ -328,5 +305,26 @@ public class GeneratorTests
         var inst = GetInstructions(program, "main");
 
         Assert.Contains(inst, i => i.OpCode == OpCode.CALL_METHOD);
+    }
+
+    private static BytecodeProgram Generate(string source)
+    {
+        var lexer = new Lexer.Lexer.Lexer(source);
+        var tokens = lexer.Tokenize();
+        var parser = new Parser.Parser.Parser(tokens);
+        var result = parser.Parse();
+
+        if (result.HasErrors)
+            throw new Exception($"Parser errors: {string.Join(", ", result.Diagnostics.Select(d => d.Message))}");
+
+        var generator = new BytecodeGenerator();
+        return generator.Generate(result.Root);
+    }
+
+    private static List<Instruction> GetInstructions(BytecodeProgram program, string funcName)
+    {
+        var func = program.Functions.FirstOrDefault(f => f.Name == funcName);
+        Assert.NotNull(func);
+        return func.Code;
     }
 }

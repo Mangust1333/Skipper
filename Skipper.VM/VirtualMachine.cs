@@ -13,6 +13,7 @@ public sealed class VirtualMachine : IRootProvider
 
     // Стек вызовов
     private readonly Stack<StackFrame> _callStack = new();
+
     // Глобальный стек операндов
     private readonly Stack<Value> _evalStack = new();
 
@@ -29,7 +30,7 @@ public sealed class VirtualMachine : IRootProvider
 
     public Value Run(string entryPointName)
     {
-        BytecodeFunction? mainFunc = _program.Functions.FirstOrDefault(f => f.Name == entryPointName);
+        var mainFunc = _program.Functions.FirstOrDefault(f => f.Name == entryPointName);
         if (mainFunc == null)
         {
             throw new InvalidOperationException($"Function '{entryPointName}' not found");
@@ -41,9 +42,10 @@ public sealed class VirtualMachine : IRootProvider
         {
             while (_currentFunc != null && _ip < _currentFunc.Code.Count)
             {
-                Console.WriteLine($"[STEP] Func: {_currentFunc.Name}, IP: {_ip} (Total: {_currentFunc.Code.Count}), Op: {_currentFunc.Code[_ip].OpCode}");
+                Console.WriteLine(
+                    $"[STEP] Func: {_currentFunc.Name}, IP: {_ip} (Total: {_currentFunc.Code.Count}), Op: {_currentFunc.Code[_ip].OpCode}");
 
-                Instruction instr = _currentFunc.Code[_ip];
+                var instr = _currentFunc.Code[_ip];
                 Execute(instr);
 
                 if (_callStack.Count == 0)
@@ -51,9 +53,11 @@ public sealed class VirtualMachine : IRootProvider
                     break;
                 }
             }
-        } catch (Exception ex)
+        }
+        catch (Exception ex)
         {
-            Console.WriteLine($"[VM Runtime Error] Func: {_currentFunc?.Name}, IP: {_ip}, Op: {_currentFunc?.Code[_ip].OpCode}. Error: {ex.Message}");
+            Console.WriteLine(
+                $"[VM Runtime Error] Func: {_currentFunc?.Name}, IP: {_ip}, Op: {_currentFunc?.Code[_ip].OpCode}. Error: {ex.Message}");
             throw;
         }
 
@@ -91,8 +95,8 @@ public sealed class VirtualMachine : IRootProvider
                 break;
 
             case OpCode.SWAP:
-                Value top = _evalStack.Pop();
-                Value below = _evalStack.Pop();
+                var top = _evalStack.Pop();
+                var below = _evalStack.Pop();
                 _evalStack.Push(top);
                 _evalStack.Push(below);
                 _ip++;
@@ -108,7 +112,7 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(_currentLocals![slot]);
                 _ip++;
             }
-            break;
+                break;
 
             case OpCode.STORE_LOCAL:
             {
@@ -116,7 +120,7 @@ public sealed class VirtualMachine : IRootProvider
                 _currentLocals![slot] = _evalStack.Pop();
                 _ip++;
             }
-            break;
+                break;
 
             // ===========================
             // Арифметика
@@ -128,7 +132,7 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromInt(a + b));
                 _ip++;
             }
-            break;
+                break;
 
             case OpCode.SUB:
             {
@@ -137,7 +141,7 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromInt(a - b));
                 _ip++;
             }
-            break;
+                break;
 
             case OpCode.MUL:
             {
@@ -146,7 +150,7 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromInt(a * b));
                 _ip++;
             }
-            break;
+                break;
 
             case OpCode.DIV:
             {
@@ -160,7 +164,7 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromInt(a / b));
                 _ip++;
             }
-            break;
+                break;
 
             case OpCode.MOD:
             {
@@ -174,7 +178,7 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromInt(a % b));
                 _ip++;
             }
-            break;
+                break;
 
             case OpCode.NEG:
             {
@@ -182,7 +186,7 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromInt(-a));
                 _ip++;
             }
-            break;
+                break;
 
             // ===========================
             // Сравнения
@@ -194,7 +198,7 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromBool(a == b));
                 _ip++;
             }
-            break;
+                break;
             case OpCode.CMP_NE:
             {
                 var b = _evalStack.Pop().Raw;
@@ -202,7 +206,7 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromBool(a != b));
                 _ip++;
             }
-            break;
+                break;
             case OpCode.CMP_LT:
             {
                 var b = _evalStack.Pop().AsInt();
@@ -210,7 +214,7 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromBool(a < b));
                 _ip++;
             }
-            break;
+                break;
             case OpCode.CMP_GT:
             {
                 var b = _evalStack.Pop().AsInt();
@@ -218,7 +222,7 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromBool(a > b));
                 _ip++;
             }
-            break;
+                break;
             case OpCode.CMP_LE:
             {
                 var b = _evalStack.Pop().AsInt();
@@ -226,7 +230,7 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromBool(a <= b));
                 _ip++;
             }
-            break;
+                break;
             case OpCode.CMP_GE:
             {
                 var b = _evalStack.Pop().AsInt();
@@ -234,7 +238,7 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromBool(a >= b));
                 _ip++;
             }
-            break;
+                break;
 
             // ===========================
             // Логика
@@ -246,7 +250,7 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromBool(a && b));
                 _ip++;
             }
-            break;
+                break;
             case OpCode.OR:
             {
                 var b = _evalStack.Pop().AsBool();
@@ -254,14 +258,14 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromBool(a || b));
                 _ip++;
             }
-            break;
+                break;
             case OpCode.NOT:
             {
                 var a = _evalStack.Pop().AsBool();
                 _evalStack.Push(Value.FromBool(!a));
                 _ip++;
             }
-            break;
+                break;
 
             // ===========================
             // Поток управления
@@ -272,34 +276,36 @@ public sealed class VirtualMachine : IRootProvider
 
             case OpCode.JUMP_IF_TRUE:
             {
-                Value cond = _evalStack.Pop();
+                var cond = _evalStack.Pop();
                 if (cond.AsBool())
                 {
                     _ip = Convert.ToInt32(instr.Operands[0]);
-                } else
+                }
+                else
                 {
                     _ip++;
                 }
             }
-            break;
+                break;
 
             case OpCode.JUMP_IF_FALSE:
             {
-                Value cond = _evalStack.Pop();
+                var cond = _evalStack.Pop();
                 if (!cond.AsBool())
                 {
                     _ip = Convert.ToInt32(instr.Operands[0]);
-                } else
+                }
+                else
                 {
                     _ip++;
                 }
             }
-            break;
+                break;
 
             case OpCode.CALL:
             {
                 var funcId = Convert.ToInt32(instr.Operands[0]);
-                BytecodeFunction? target = _program.Functions.FirstOrDefault(f => f.FunctionId == funcId);
+                var target = _program.Functions.FirstOrDefault(f => f.FunctionId == funcId);
                 if (target == null)
                 {
                     throw new InvalidOperationException($"Func ID {funcId} not found");
@@ -307,7 +313,7 @@ public sealed class VirtualMachine : IRootProvider
 
                 PushFrame(target, _ip + 1);
             }
-            break;
+                break;
 
             case OpCode.RETURN:
                 PopFrame();
@@ -319,7 +325,7 @@ public sealed class VirtualMachine : IRootProvider
             case OpCode.NEW_OBJECT:
             {
                 var classId = Convert.ToInt32(instr.Operands[0]);
-                BytecodeClass? cls = _program.Classes.FirstOrDefault(c => c.ClassId == classId);
+                var cls = _program.Classes.FirstOrDefault(c => c.ClassId == classId);
                 if (cls == null)
                 {
                     throw new InvalidOperationException($"Class ID {classId} not found");
@@ -342,32 +348,32 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromObject(ptr));
                 _ip++;
             }
-            break;
+                break;
 
             case OpCode.GET_FIELD:
             {
                 var fieldIdx = Convert.ToInt32(instr.Operands[1]);
-                Value objRef = _evalStack.Pop();
+                var objRef = _evalStack.Pop();
                 CheckNull(objRef);
 
                 // Используем RuntimeContext для безопасного чтения (с учетом Header)
-                Value val = _runtime.ReadField(objRef.AsObject(), fieldIdx);
+                var val = _runtime.ReadField(objRef.AsObject(), fieldIdx);
                 _evalStack.Push(val);
                 _ip++;
             }
-            break;
+                break;
 
             case OpCode.SET_FIELD:
             {
                 var fieldIdx = Convert.ToInt32(instr.Operands[1]);
-                Value val = _evalStack.Pop();
-                Value objRef = _evalStack.Pop(); // Object is below value on stack
+                var val = _evalStack.Pop();
+                var objRef = _evalStack.Pop(); // Object is below value on stack
                 CheckNull(objRef);
 
                 _runtime.WriteField(objRef.AsObject(), fieldIdx, val);
                 _ip++;
             }
-            break;
+                break;
 
             // ===========================
             // Массивы
@@ -397,32 +403,32 @@ public sealed class VirtualMachine : IRootProvider
                 _evalStack.Push(Value.FromObject(ptr));
                 _ip++;
             }
-            break;
+                break;
 
             case OpCode.GET_ELEMENT:
             {
                 var index = _evalStack.Pop().AsInt();
-                Value arrRef = _evalStack.Pop();
+                var arrRef = _evalStack.Pop();
                 CheckNull(arrRef);
 
                 // Runtime сам проверит границы массива
-                Value val = _runtime.ReadArrayElement(arrRef.AsObject(), index);
+                var val = _runtime.ReadArrayElement(arrRef.AsObject(), index);
                 _evalStack.Push(val);
                 _ip++;
             }
-            break;
+                break;
 
             case OpCode.SET_ELEMENT:
             {
-                Value val = _evalStack.Pop();
+                var val = _evalStack.Pop();
                 var index = _evalStack.Pop().AsInt();
-                Value arrRef = _evalStack.Pop();
+                var arrRef = _evalStack.Pop();
                 CheckNull(arrRef);
 
                 _runtime.WriteArrayElement(arrRef.AsObject(), index, val);
                 _ip++;
             }
-            break;
+                break;
         }
     }
 
@@ -439,6 +445,7 @@ public sealed class VirtualMachine : IRootProvider
 
             frame.Locals[i] = _evalStack.Pop();
         }
+
         _callStack.Push(frame);
         _currentFunc = func;
         _currentLocals = frame.Locals;
@@ -447,15 +454,16 @@ public sealed class VirtualMachine : IRootProvider
 
     private void PopFrame()
     {
-        StackFrame poppedFrame = _callStack.Pop();
+        var poppedFrame = _callStack.Pop();
 
         if (_callStack.Count > 0)
         {
-            StackFrame parentFrame = _callStack.Peek();
+            var parentFrame = _callStack.Peek();
             _currentFunc = parentFrame.Function;
             _currentLocals = parentFrame.Locals;
             _ip = poppedFrame.ReturnAddress;
-        } else
+        }
+        else
         {
             _currentFunc = null;
             _currentLocals = null;
@@ -463,7 +471,7 @@ public sealed class VirtualMachine : IRootProvider
         }
     }
 
-    private void CheckNull(Value refVal)
+    private static void CheckNull(Value refVal)
     {
         if (refVal.Kind == ValueKind.Null || (refVal.Kind == ValueKind.ObjectRef && refVal.Raw == 0))
         {
@@ -471,7 +479,7 @@ public sealed class VirtualMachine : IRootProvider
         }
     }
 
-    private Value ValueFromConst(object c)
+    private static Value ValueFromConst(object c)
     {
         return c switch
         {
@@ -486,7 +494,7 @@ public sealed class VirtualMachine : IRootProvider
 
     public IEnumerable<nint> EnumerateRoots()
     {
-        foreach (Value val in _evalStack)
+        foreach (var val in _evalStack)
         {
             if (val.Kind == ValueKind.ObjectRef && val.Raw != 0)
             {
@@ -494,9 +502,9 @@ public sealed class VirtualMachine : IRootProvider
             }
         }
 
-        foreach (StackFrame frame in _callStack)
+        foreach (var frame in _callStack)
         {
-            foreach (Value local in frame.Locals)
+            foreach (var local in frame.Locals)
             {
                 if (local.Kind == ValueKind.ObjectRef && local.Raw != 0)
                 {

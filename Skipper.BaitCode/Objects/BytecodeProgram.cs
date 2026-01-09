@@ -8,19 +8,23 @@ public sealed class BytecodeProgram
 {
     // Таблица типов
     public List<BytecodeType> Types { get; set; } = [];
+
     // Все функции программы (включая методы классов)
     [JsonInclude]
     public List<BytecodeFunction> Functions { get; private set; } = [];
+
     // Все классы программы
     [JsonInclude]
     public List<BytecodeClass> Classes { get; private set; } = [];
+
     // Глобальные переменные
     [JsonInclude]
     public List<BytecodeVariable> Globals { get; private set; } = [];
+
     // Общий пул констант (числа, строки, bool, имена классов)
     [JsonInclude]
     public List<object> ConstantPool { get; private set; } = [];
+
     // ID функции-точки входа
     public int EntryFunctionId { get; set; }
 }
-

@@ -1,7 +1,6 @@
 ﻿using Skipper.BaitCode.Objects;
 using Skipper.BaitCode.Objects.Instructions;
 using Skipper.Runtime;
-using Skipper.Runtime.Values;
 using Xunit;
 
 namespace Skipper.VM.Tests;
@@ -49,7 +48,7 @@ public class VmArrayTests
         program.Functions.Add(func);
 
         VirtualMachine vm = new(program, new RuntimeContext());
-        Value result = vm.Run("main");
+        var result = vm.Run("main");
 
         Assert.Equal(42, result.AsInt());
     }

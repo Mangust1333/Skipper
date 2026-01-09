@@ -1,28 +1,22 @@
-﻿using Skipper.BaitCode.Types;
-
-namespace Skipper.BaitCode.Objects;
+﻿namespace Skipper.BaitCode.Objects;
 
 public sealed class BytecodeClass
 {
     // Id класса
-    public int ClassId { get; set; }
+    public int ClassId { get; }
+
     // Имя класса
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; }
+
     // Id полей и тип по названию в классе
-    public Dictionary<string, FieldInfo> Fields { get; set; } = [];
+    public Dictionary<string, BytecodeClassField> Fields { get; } = [];
+
     // Id методов по названию в классе
-    public Dictionary<string, int> Methods { get; set; } = new();
-    public BytecodeClass() { }
+    public Dictionary<string, int> Methods { get; } = new();
 
     public BytecodeClass(int classId, string name)
     {
         ClassId = classId;
         Name = name;
     }
-}
-
-public class FieldInfo
-{
-    public int FieldId { get; set; }
-    public BytecodeType Type { get; set; } = null!;
 }

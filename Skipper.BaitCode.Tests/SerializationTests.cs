@@ -7,16 +7,6 @@ namespace Skipper.BaitCode.Tests;
 
 public class SerializationTests
 {
-    private static BytecodeProgram Generate(string source)
-    {
-        var lexer = new Lexer.Lexer.Lexer(source);
-        var tokens = lexer.Tokenize();
-        var parser = new Parser.Parser.Parser(tokens);
-        var result = parser.Parse();
-        var generator = new BytecodeGenerator();
-        return generator.Generate(result.Root);
-    }
-
     [Fact]
     public void Serialization_FullCycle_PreservesData()
     {
@@ -63,14 +53,14 @@ public class SerializationTests
 
             // 3. Проверяем константы
             Assert.Equal(originalProgram.ConstantPool.Count, loadedProgram.ConstantPool.Count);
-        } finally
+        }
+        finally
         {
             if (File.Exists(tempFile))
                 File.Delete(tempFile);
         }
     }
-    
-    
+
     [Fact]
     public void Serialization_ArrayTypes_RestoredCorrectly()
     {
@@ -93,7 +83,8 @@ public class SerializationTests
             var elemType = arrayType.ElementType as Types.PrimitiveType;
             Assert.NotNull(elemType);
             Assert.Equal("int", elemType.Name);
-        } finally
+        }
+        finally
         {
             if (File.Exists(tempFile))
                 File.Delete(tempFile);
@@ -133,7 +124,8 @@ public class SerializationTests
             // Нюанс JSON: Числа восстанавливаются как JsonElement. Проверяем, что операнд читаем.
             var op0 = jumpInstr.Operands[0];
             Assert.True(int.TryParse(op0.ToString(), out _), $"Operand {op0} should be parseable as int");
-        } finally
+        }
+        finally
         {
             if (File.Exists(tempFile))
                 File.Delete(tempFile);
@@ -158,10 +150,21 @@ public class SerializationTests
             Assert.NotNull(loaded);
             Assert.Single(loaded.Functions); // Только main
             Assert.Empty(loaded.Classes);
-        } finally
+        }
+        finally
         {
             if (File.Exists(tempFile))
                 File.Delete(tempFile);
         }
+    }
+
+    private static BytecodeProgram Generate(string source)
+    {
+        var lexer = new Lexer.Lexer.Lexer(source);
+        var tokens = lexer.Tokenize();
+        var parser = new Parser.Parser.Parser(tokens);
+        var result = parser.Parse();
+        var generator = new BytecodeGenerator();
+        return generator.Generate(result.Root);
     }
 }

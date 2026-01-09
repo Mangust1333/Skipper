@@ -2,9 +2,7 @@
 
 public sealed class PrimitiveType : BytecodeType
 {
-    public string Name { get; set; } = string.Empty;
-
-    public PrimitiveType() { }
+    public string Name { get; }
 
     public PrimitiveType(string name)
     {

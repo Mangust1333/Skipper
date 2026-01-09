@@ -1,7 +1,6 @@
 ﻿using Skipper.BaitCode.Objects;
 using Skipper.BaitCode.Objects.Instructions;
 using Skipper.Runtime;
-using Skipper.Runtime.Values;
 using Xunit;
 
 namespace Skipper.VM.Tests;
@@ -20,29 +19,29 @@ public class VmRecursionTests
         program.ConstantPool.Add(1); // Index 0
         program.ConstantPool.Add(5); // Index 1
 
-        var paramsFact = new List<FuncParam> { new() { Name = "n" } };
+        var paramsFact = new List<BytecodeFunctionParameter> { new("n", null!) };
 
         BytecodeFunction factFunc = new(0, "fact", null!, paramsFact)
         {
             Code =
             [
-                new Instruction(OpCode.LOAD_LOCAL, 0, 0),  // 0: n
-                new Instruction(OpCode.PUSH, 0),           // 1: 1
-                new Instruction(OpCode.CMP_LE),            // 2: n <= 1
-                new Instruction(OpCode.JUMP_IF_FALSE, 6),  // 3: else -> 6
+                new Instruction(OpCode.LOAD_LOCAL, 0, 0), // 0: n
+                new Instruction(OpCode.PUSH, 0), // 1: 1
+                new Instruction(OpCode.CMP_LE), // 2: n <= 1
+                new Instruction(OpCode.JUMP_IF_FALSE, 6), // 3: else -> 6
 
                 // if
-                new Instruction(OpCode.PUSH, 0),           // 4: 1
-                new Instruction(OpCode.RETURN),            // 5
+                new Instruction(OpCode.PUSH, 0), // 4: 1
+                new Instruction(OpCode.RETURN), // 5
 
                 // else
-                new Instruction(OpCode.LOAD_LOCAL, 0, 0),  // 6: n
-                new Instruction(OpCode.LOAD_LOCAL, 0, 0),  // 7: n
-                new Instruction(OpCode.PUSH, 0),           // 8: 1
-                new Instruction(OpCode.SUB),               // 9: n-1
-                new Instruction(OpCode.CALL, 0),           // 10: fact(n-1)
-                new Instruction(OpCode.MUL),               // 11
-                new Instruction(OpCode.RETURN)             // 12
+                new Instruction(OpCode.LOAD_LOCAL, 0, 0), // 6: n
+                new Instruction(OpCode.LOAD_LOCAL, 0, 0), // 7: n
+                new Instruction(OpCode.PUSH, 0), // 8: 1
+                new Instruction(OpCode.SUB), // 9: n-1
+                new Instruction(OpCode.CALL, 0), // 10: fact(n-1)
+                new Instruction(OpCode.MUL), // 11
+                new Instruction(OpCode.RETURN) // 12
             ]
         };
 
@@ -50,9 +49,9 @@ public class VmRecursionTests
         {
             Code =
             [
-                 new Instruction(OpCode.PUSH, 1), // 5
-                 new Instruction(OpCode.CALL, 0), // fact(5)
-                 new Instruction(OpCode.RETURN)
+                new Instruction(OpCode.PUSH, 1), // 5
+                new Instruction(OpCode.CALL, 0), // fact(5)
+                new Instruction(OpCode.RETURN)
             ]
         };
 
@@ -60,7 +59,7 @@ public class VmRecursionTests
         program.Functions.Add(mainFunc);
 
         VirtualMachine vm = new(program, new RuntimeContext());
-        Value result = vm.Run("main");
+        var result = vm.Run("main");
 
         Assert.Equal(120, result.AsInt()); // 5! = 120
     }

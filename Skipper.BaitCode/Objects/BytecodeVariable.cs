@@ -2,12 +2,16 @@
 
 namespace Skipper.BaitCode.Objects;
 
-public class BytecodeVariable(int variableId, string name, BytecodeType type)
+public sealed class BytecodeVariable
 {
-    // Id переменной
-    public int VariableId { get; set; } = variableId;
-    // Название переменной
-    public string Name { get; set; } = name;
-    // Тип переменной
-    public BytecodeType Type { get; set; } = type;
+    public int VariableId { get; }
+    public string Name { get; }
+    public BytecodeType Type { get; }
+
+    public BytecodeVariable(int variableId, string name, BytecodeType type)
+    {
+        VariableId = variableId;
+        Name = name;
+        Type = type;
+    }
 }

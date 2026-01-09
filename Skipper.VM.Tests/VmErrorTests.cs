@@ -34,13 +34,13 @@ public class VmErrorTests
     public void Run_NullReference_ThrowsException()
     {
         BytecodeProgram program = new();
-        program.ConstantPool.Add(null); // null
+        program.ConstantPool.Add(null!); // null
 
         BytecodeFunction func = new(0, "main", null!, [])
         {
             Code =
             [
-                new Instruction(OpCode.PUSH, 0),      // Загрузка null
+                new Instruction(OpCode.PUSH, 0), // Загрузка null
                 new Instruction(OpCode.GET_FIELD, 0), // Попытка чтения поля у null
                 new Instruction(OpCode.RETURN)
             ]
@@ -62,9 +62,9 @@ public class VmErrorTests
         {
             Code =
             [
-                new Instruction(OpCode.PUSH, 0),     // Размер 2
+                new Instruction(OpCode.PUSH, 0), // Размер 2
                 new Instruction(OpCode.NEW_ARRAY),
-                new Instruction(OpCode.PUSH, 1),     // Индекс 5
+                new Instruction(OpCode.PUSH, 1), // Индекс 5
                 new Instruction(OpCode.GET_ELEMENT), // Выход за границы массива
                 new Instruction(OpCode.RETURN)
             ]

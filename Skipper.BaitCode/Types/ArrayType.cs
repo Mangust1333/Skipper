@@ -2,12 +2,10 @@
 
 public sealed class ArrayType : BytecodeType
 {
-    public BytecodeType ElementType { get; set; } = null!;
+    public BytecodeType ElementType { get; }
 
-    public ArrayType() { }
-
-    public ArrayType(BytecodeType element)
+    public ArrayType(BytecodeType elementType)
     {
-        ElementType = element;
+        ElementType = elementType;
     }
 }

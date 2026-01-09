@@ -18,8 +18,8 @@ public class VmMemoryTests
 
         List<Instruction> code =
         [
-            new Instruction(OpCode.NEW_OBJECT, 0), // Создание объекта класса 0
-            new Instruction(OpCode.RETURN)
+            new(OpCode.NEW_OBJECT, 0), // Создание объекта класса 0
+            new(OpCode.RETURN)
         ];
 
         BytecodeFunction func = new(0, "main", null!, [])
@@ -45,10 +45,10 @@ public class VmMemoryTests
         program.ConstantPool.Add(5);
 
         // Функция add(a, b) { return a + b }
-        var paramsAdd = new List<FuncParam>
+        var paramsAdd = new List<BytecodeFunctionParameter>
         {
-            new() { Name = "a" },
-            new() { Name = "b" }
+            new("a", null!),
+            new("b", null!)
         };
 
         BytecodeFunction addFunc = new(1, "add", null!, paramsAdd)
@@ -78,7 +78,7 @@ public class VmMemoryTests
         program.Functions.Add(addFunc);
 
         VirtualMachine vm = new(program, new RuntimeContext());
-        Value result = vm.Run("main");
+        var result = vm.Run("main");
 
         Assert.Equal(15, result.AsInt());
     }
@@ -90,11 +90,11 @@ public class VmMemoryTests
         program.Classes.Add(new BytecodeClass(0, "Temp"));
 
         List<Instruction> code =
-    [
-        new Instruction(OpCode.NEW_OBJECT, 0),
-        new Instruction(OpCode.POP),
-        new Instruction(OpCode.RETURN)
-    ];
+        [
+            new(OpCode.NEW_OBJECT, 0),
+            new(OpCode.POP),
+            new(OpCode.RETURN)
+        ];
 
         BytecodeFunction func = new(0, "main", null!, []) { Code = code };
         program.Functions.Add(func);

@@ -2,10 +2,8 @@
 
 public sealed class ClassType : BytecodeType
 {
-    public int ClassId { get; set; }
-    public string Name { get; set; } = string.Empty;
-
-    public ClassType() { }
+    public int ClassId { get; }
+    public string Name { get; }
 
     public ClassType(int classId, string name)
     {
