@@ -344,4 +344,75 @@ public class StatementTests
         Assert.IsType<BinaryExpression>(ternary.ThenBranch);
         Assert.IsType<BinaryExpression>(ternary.ElseBranch);
     }
+
+    [Fact]
+    public void Parse_EmptyBlock_Works()
+    {
+        // Arrange
+        const string source = "fn test() { {} }"; // Блок внутри функции пустой
+
+        // Act
+        var program = TestHelpers.Parse(source);
+        var func = (FunctionDeclaration)program.Declarations[0];
+        var outerBlock = func.Body;
+
+        // Assert
+        var innerBlock = Assert.IsType<BlockStatement>(outerBlock.Statements[0]);
+        Assert.Empty(innerBlock.Statements);
+    }
+
+    [Fact]
+    public void Parse_DanglingElse_BindsToInnerIf()
+    {
+        // Проблема "висячего else": if (a) if (b) s1 else s2
+        // else должен относиться к if (b), а не к if (a)
+
+        // Arrange
+        const string source = """
+                              fn test() {
+                                  if (a) 
+                                      if (b) 
+                                          return 1; 
+                                      else 
+                                          return 2;
+                              }
+                              """;
+
+        // Act
+        var program = TestHelpers.Parse(source);
+        var func = (FunctionDeclaration)program.Declarations[0];
+
+        // Assert
+        var outerIf = Assert.IsType<IfStatement>(func.Body.Statements[0]);
+
+        // У внешнего if не должно быть else
+        Assert.Null(outerIf.ElseBranch);
+
+        // Внутри then-ветки лежит второй if
+        var innerIf = Assert.IsType<IfStatement>(outerIf.ThenBranch);
+
+        // У внутреннего if должен быть else
+        Assert.NotNull(innerIf.ElseBranch);
+        var elseStmt = Assert.IsType<ReturnStatement>(innerIf.ElseBranch);
+        Assert.Equal(2, ((LiteralExpression)elseStmt.Value).Value);
+    }
+
+    [Fact]
+    public void Parse_ForLoop_WithMissingParts()
+    {
+        // for (; i < 10; )
+
+        // Arrange
+        const string source = "fn test() { for (; i < 10;) { } }";
+
+        // Act
+        var program = TestHelpers.Parse(source);
+        var func = (FunctionDeclaration)program.Declarations[0];
+        var forStmt = Assert.IsType<ForStatement>(func.Body.Statements[0]);
+
+        // Assert
+        Assert.Null(forStmt.Initializer);
+        Assert.NotNull(forStmt.Condition);
+        Assert.Null(forStmt.Increment);
+    }
 }

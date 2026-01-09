@@ -1,4 +1,4 @@
-using Skipper.Semantic.TypeSymbols;
+﻿using Skipper.Semantic.TypeSymbols;
 
 namespace Skipper.Semantic.Symbols;
 

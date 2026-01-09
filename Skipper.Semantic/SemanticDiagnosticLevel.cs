@@ -1,4 +1,4 @@
-namespace Skipper.Semantic;
+﻿namespace Skipper.Semantic;
 
 public enum SemanticDiagnosticLevel
 {

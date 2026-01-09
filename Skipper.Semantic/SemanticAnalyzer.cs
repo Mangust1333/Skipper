@@ -1,4 +1,4 @@
-using Skipper.Lexer.Tokens;
+﻿using Skipper.Lexer.Tokens;
 using Skipper.Parser.AST;
 using Skipper.Parser.AST.Declarations;
 using Skipper.Parser.AST.Expressions;
@@ -508,15 +508,20 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
                 if (node.Left is IdentifierExpression id)
                 {
                     var sym = _currentScope.Resolve(id.Name);
-                    if (sym == null)
-                    {
-                        ReportError($"Unknown identifier '{id.Name}'", id.Token);
-                    }
-                    else
+                    if (sym != null)
                     {
                         leftTargetType = sym.Type;
                     }
-                }
+                    // ДОБАВЛЕНО: Проверяем поля класса
+                    else if (_currentClass != null && _currentClass.Class.Fields.TryGetValue(id.Name, out var field))
+                    {
+                        leftTargetType = field.Type;
+                    } 
+                    else
+                    {
+                        ReportError($"Unknown identifier '{id.Name}'", id.Token);
+                    }
+                } 
                 else if (node.Left is MemberAccessExpression ma)
                 {
                     var objType = ma.Object.Accept(this);
@@ -624,6 +629,15 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
             return sym.Type;
         }
 
+        // Если не нашли, и мы внутри класса — ищем в полях (неявный this)
+        if (_currentClass != null)
+        {
+            if (_currentClass.Class.Fields.TryGetValue(node.Name, out var field))
+            {
+                return field.Type;
+            }
+        }
+
         ReportError($"Unknown identifier '{node.Name}'", node.Token);
         return BuiltinTypeSymbol.Void;
     }
@@ -633,13 +647,29 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
         if (node.Callee is IdentifierExpression id)
         {
             var sym = _currentScope.Resolve(id.Name);
-            if (sym is FunctionSymbol fs)
+
+            if (sym != null)
             {
-                ValidateArguments(fs.Parameters, node.Arguments, id.Token);
-                return fs.Type;
+                if (sym is FunctionSymbol fs)
+                {
+                    ValidateArguments(fs.Parameters, node.Arguments, id.Token);
+                    return fs.Type;
+                }
+
+                ReportError($"'{id.Name}' is not a function", id.Token);
+                return BuiltinTypeSymbol.Void;
             }
 
-            ReportError($"'{id.Name}' is not a function", id.Token);
+            if (_currentClass != null)
+            {
+                if (_currentClass.Class.Methods.TryGetValue(id.Name, out var method))
+                {
+                    ValidateArguments(method.Parameters, node.Arguments, id.Token);
+                    return method.Type;
+                }
+            }
+
+            ReportError($"Unknown function or method '{id.Name}'", id.Token);
             return BuiltinTypeSymbol.Void;
         }
 

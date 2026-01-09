@@ -1,4 +1,4 @@
-using Skipper.Runtime.Abstractions;
+﻿using Skipper.Runtime.Abstractions;
 using Skipper.Runtime.Memory;
 
 namespace Skipper.Runtime.GC;
@@ -33,7 +33,7 @@ public sealed class MarkSweepGc : IGarbageCollector
         while (stack.Count > 0)
         {
             var ptr = stack.Pop();
-            var obj = _heap.FindObject(ptr);
+            HeapObject? obj = _heap.FindObject(ptr);
 
             if (obj == null || obj.Marked)
             {
@@ -53,7 +53,7 @@ public sealed class MarkSweepGc : IGarbageCollector
     {
         for (var i = _heap.Objects.Count - 1; i >= 0; i--)
         {
-            var obj = _heap.Objects[i];
+            HeapObject obj = _heap.Objects[i];
 
             if (obj.Marked)
             {

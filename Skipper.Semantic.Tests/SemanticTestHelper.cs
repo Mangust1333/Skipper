@@ -1,4 +1,4 @@
-namespace Skipper.Semantic.Tests;
+﻿namespace Skipper.Semantic.Tests;
 
 public static class SemanticTestHelper
 {

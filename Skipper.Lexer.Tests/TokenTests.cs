@@ -222,4 +222,16 @@ public class TokenTests
         // Assert
         Assert.Equal("Token(NUMBER, '123' at 2:5)", result);
     }
+
+    [Fact]
+    public void GetNumericValue_Overflow_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        // Число больше int.MaxValue (2147483647)
+        var largeNumber = "2147483648";
+        var token = new Token(TokenType.NUMBER, largeNumber);
+
+        // Act & Assert
+        var ex = Assert.Throws<InvalidOperationException>(() => token.GetNumericValue());
+    }
 }
