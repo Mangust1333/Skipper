@@ -2,7 +2,7 @@
 
 public sealed class ArrayType : BytecodeType
 {
-    public BytecodeType ElementType { get; set; } = default!;
+    public BytecodeType ElementType { get; set; } = null!;
 
     public ArrayType() { }
 

@@ -86,11 +86,11 @@ public class SerializationTests
 
             // Assert
             // Ищем тип массива в таблице типов
-            var arrayType = loaded.Types.OfType<Skipper.BaitCode.Types.ArrayType>().FirstOrDefault();
+            var arrayType = loaded.Types.OfType<Types.ArrayType>().FirstOrDefault();
             Assert.NotNull(arrayType);
 
             // Проверяем вложенный тип
-            var elemType = arrayType.ElementType as Skipper.BaitCode.Types.PrimitiveType;
+            var elemType = arrayType.ElementType as Types.PrimitiveType;
             Assert.NotNull(elemType);
             Assert.Equal("int", elemType.Name);
         } finally
@@ -122,12 +122,12 @@ public class SerializationTests
             var mainFunc = loaded.Functions.First(f => f.Name == "main");
 
             // Проверяем CALL
-            var callInstr = mainFunc.Code.FirstOrDefault(i => i.OpCode == Skipper.BaitCode.Objects.Instructions.OpCode.CALL);
+            var callInstr = mainFunc.Code.FirstOrDefault(i => i.OpCode == Objects.Instructions.OpCode.CALL);
             Assert.NotNull(callInstr);
             Assert.NotEmpty(callInstr.Operands); // Операнд (ID функции) должен быть
 
             // Проверяем JUMP
-            var jumpInstr = mainFunc.Code.FirstOrDefault(i => i.OpCode == Skipper.BaitCode.Objects.Instructions.OpCode.JUMP_IF_FALSE);
+            var jumpInstr = mainFunc.Code.FirstOrDefault(i => i.OpCode == Objects.Instructions.OpCode.JUMP_IF_FALSE);
             Assert.NotNull(jumpInstr);
 
             // Нюанс JSON: Числа восстанавливаются как JsonElement. Проверяем, что операнд читаем.

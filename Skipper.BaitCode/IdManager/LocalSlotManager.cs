@@ -6,7 +6,6 @@ namespace Skipper.BaitCode.IdManager;
 /// <summary>
 /// Управление слотами для локальных переменных и параметров
 /// </summary>
-
 public sealed class LocalSlotManager(BytecodeFunction function)
 {
     private readonly Stack<Dictionary<string, int>> _scopes = new();

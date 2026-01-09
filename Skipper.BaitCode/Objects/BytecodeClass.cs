@@ -1,5 +1,4 @@
-﻿using System.Text.Json.Serialization;
-using Skipper.BaitCode.Types;
+﻿using Skipper.BaitCode.Types;
 
 namespace Skipper.BaitCode.Objects;
 
@@ -25,5 +24,5 @@ public sealed class BytecodeClass
 public class FieldInfo
 {
     public int FieldId { get; set; }
-    public BytecodeType Type { get; set; } = default!;
+    public BytecodeType Type { get; set; } = null!;
 }

@@ -38,7 +38,7 @@ public class BytecodeFunction
 public class FuncParam
 {
     public string Name { get; set; } = string.Empty;
-    public BytecodeType Type { get; set; } = default!;
+    public BytecodeType Type { get; set; } = null!;
 
     public FuncParam() { }
 
