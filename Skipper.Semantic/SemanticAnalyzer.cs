@@ -1,4 +1,4 @@
-using Skipper.Lexer.Tokens;
+п»їusing Skipper.Lexer.Tokens;
 using Skipper.Parser.AST;
 using Skipper.Parser.AST.Declarations;
 using Skipper.Parser.AST.Expressions;
@@ -512,7 +512,7 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
                     {
                         leftTargetType = sym.Type;
                     }
-                    // ДОБАВЛЕНО: Проверяем поля класса
+                    // Р”РћР‘РђР’Р›Р•РќРћ: РџСЂРѕРІРµСЂСЏРµРј РїРѕР»СЏ РєР»Р°СЃСЃР°
                     else if (_currentClass != null && _currentClass.Class.Fields.TryGetValue(id.Name, out var field))
                     {
                         leftTargetType = field.Type;
@@ -629,7 +629,7 @@ public sealed class SemanticAnalyzer : IAstVisitor<TypeSymbol>
             return sym.Type;
         }
 
-        // Если не нашли, и мы внутри класса — ищем в полях (неявный this)
+        // Р•СЃР»Рё РЅРµ РЅР°С€Р»Рё, Рё РјС‹ РІРЅСѓС‚СЂРё РєР»Р°СЃСЃР° вЂ” РёС‰РµРј РІ РїРѕР»СЏС… (РЅРµСЏРІРЅС‹Р№ this)
         if (_currentClass != null)
         {
             if (_currentClass.Class.Fields.TryGetValue(node.Name, out var field))

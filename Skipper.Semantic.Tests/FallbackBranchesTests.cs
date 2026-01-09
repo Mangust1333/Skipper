@@ -1,4 +1,4 @@
-using Skipper.Lexer.Tokens;
+﻿using Skipper.Lexer.Tokens;
 using Skipper.Parser.AST;
 using Skipper.Parser.AST.Declarations;
 using Skipper.Parser.AST.Expressions;

@@ -1,4 +1,4 @@
-using Skipper.Lexer.Tokens;
+﻿using Skipper.Lexer.Tokens;
 
 namespace Skipper.Semantic;
 

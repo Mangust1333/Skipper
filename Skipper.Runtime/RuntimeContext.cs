@@ -1,4 +1,4 @@
-using Skipper.Runtime.Abstractions;
+п»їusing Skipper.Runtime.Abstractions;
 using Skipper.Runtime.GC;
 using Skipper.Runtime.Memory;
 using Skipper.Runtime.Objects;
@@ -11,20 +11,20 @@ public sealed class RuntimeContext
     private readonly Heap _heap;
     private readonly IGarbageCollector _gc;
 
-    // Размер заголовка 
-    // Размер заголовка объекта/массива в байтах (метаданные или длина)
+    // Р Р°Р·РјРµСЂ Р·Р°РіРѕР»РѕРІРєР° 
+    // Р Р°Р·РјРµСЂ Р·Р°РіРѕР»РѕРІРєР° РѕР±СЉРµРєС‚Р°/РјР°СЃСЃРёРІР° РІ Р±Р°Р№С‚Р°С… (РјРµС‚Р°РґР°РЅРЅС‹Рµ РёР»Рё РґР»РёРЅР°)
     private const int HeaderSize = sizeof(long);
 
-    // Размер одного слота значения (8 байт)
+    // Р Р°Р·РјРµСЂ РѕРґРЅРѕРіРѕ СЃР»РѕС‚Р° Р·РЅР°С‡РµРЅРёСЏ (8 Р±Р°Р№С‚)
     private const int SlotSize = sizeof(long);
 
     public RuntimeContext()
     {
-        _heap = new Heap(1024 * 1024); // 1 MB для тестов
+        _heap = new Heap(1024 * 1024); // 1 MB РґР»СЏ С‚РµСЃС‚РѕРІ
         _gc = new MarkSweepGc(_heap);
     }
 
-    // --- Управление памятью ---
+    // --- РЈРїСЂР°РІР»РµРЅРёРµ РїР°РјСЏС‚СЊСЋ ---
 
     public bool CanAllocate(int bytes)
     {
@@ -36,16 +36,16 @@ public sealed class RuntimeContext
         _gc.Collect(roots);
     }
 
-    // --- Аллокация ---
+    // --- РђР»Р»РѕРєР°С†РёСЏ ---
 
     public nint AllocateObject(int payloadSize, int classId)
     {
         ObjectDescriptor desc = new(ObjectKind.Class, null);
 
-        // Выделяем память: Заголовок + Поля
+        // Р’С‹РґРµР»СЏРµРј РїР°РјСЏС‚СЊ: Р—Р°РіРѕР»РѕРІРѕРє + РџРѕР»СЏ
         var ptr = _heap.Allocate(desc, HeaderSize + payloadSize);
 
-        // В заголовок записываем ClassId
+        // Р’ Р·Р°РіРѕР»РѕРІРѕРє Р·Р°РїРёСЃС‹РІР°РµРј ClassId
         _heap.WriteInt64(ptr, 0, classId);
 
         return ptr;
@@ -58,13 +58,13 @@ public sealed class RuntimeContext
 
         var ptr = _heap.Allocate(desc, totalSize);
 
-        // В заголовок записываем длину массива
+        // Р’ Р·Р°РіРѕР»РѕРІРѕРє Р·Р°РїРёСЃС‹РІР°РµРј РґР»РёРЅСѓ РјР°СЃСЃРёРІР°
         _heap.WriteInt64(ptr, 0, length);
 
         return ptr;
     }
 
-    // --- Доступ к полям объектов ---
+    // --- Р”РѕСЃС‚СѓРї Рє РїРѕР»СЏРј РѕР±СЉРµРєС‚РѕРІ ---
 
     public Value ReadField(nint objPtr, int fieldIndex)
     {
@@ -79,7 +79,7 @@ public sealed class RuntimeContext
         _heap.WriteInt64(objPtr, offset, val.Raw);
     }
 
-    // --- Доступ к массивам ---
+    // --- Р”РѕСЃС‚СѓРї Рє РјР°СЃСЃРёРІР°Рј ---
 
     public int GetArrayLength(nint arrPtr)
     {

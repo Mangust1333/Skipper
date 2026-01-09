@@ -1,4 +1,4 @@
-namespace Skipper.Runtime.Objects;
+﻿namespace Skipper.Runtime.Objects;
 
 public enum ObjectKind
 {

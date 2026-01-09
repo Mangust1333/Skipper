@@ -1,4 +1,4 @@
-using Skipper.BaitCode.Objects;
+п»їusing Skipper.BaitCode.Objects;
 using Skipper.BaitCode.Objects.Instructions;
 using Skipper.Runtime;
 using Skipper.Runtime.Abstractions;
@@ -11,12 +11,12 @@ public sealed class VirtualMachine : IRootProvider
     private readonly RuntimeContext _runtime;
     private readonly BytecodeProgram _program;
 
-    // Стек вызовов
+    // РЎС‚РµРє РІС‹Р·РѕРІРѕРІ
     private readonly Stack<StackFrame> _callStack = new();
-    // Глобальный стек операндов
+    // Р“Р»РѕР±Р°Р»СЊРЅС‹Р№ СЃС‚РµРє РѕРїРµСЂР°РЅРґРѕРІ
     private readonly Stack<Value> _evalStack = new();
 
-    // Регистры VM
+    // Р РµРіРёСЃС‚СЂС‹ VM
     private int _ip;
     private BytecodeFunction? _currentFunc;
     private Value[]? _currentLocals;
@@ -65,7 +65,7 @@ public sealed class VirtualMachine : IRootProvider
         switch (instr.OpCode)
         {
             // ===========================
-            // Стек и Константы
+            // РЎС‚РµРє Рё РљРѕРЅСЃС‚Р°РЅС‚С‹
             // ===========================
             case OpCode.PUSH:
             {
@@ -99,11 +99,11 @@ public sealed class VirtualMachine : IRootProvider
                 break;
 
             // ===========================
-            // Локальные переменные
+            // Р›РѕРєР°Р»СЊРЅС‹Рµ РїРµСЂРµРјРµРЅРЅС‹Рµ
             // ===========================
             case OpCode.LOAD_LOCAL:
             {
-                // [funcId, slot] -> нужен только slot
+                // [funcId, slot] -> РЅСѓР¶РµРЅ С‚РѕР»СЊРєРѕ slot
                 var slot = Convert.ToInt32(instr.Operands[1]);
                 _evalStack.Push(_currentLocals![slot]);
                 _ip++;
@@ -119,7 +119,7 @@ public sealed class VirtualMachine : IRootProvider
             break;
 
             // ===========================
-            // Арифметика
+            // РђСЂРёС„РјРµС‚РёРєР°
             // ===========================
             case OpCode.ADD:
             {
@@ -185,7 +185,7 @@ public sealed class VirtualMachine : IRootProvider
             break;
 
             // ===========================
-            // Сравнения
+            // РЎСЂР°РІРЅРµРЅРёСЏ
             // ===========================
             case OpCode.CMP_EQ:
             {
@@ -237,7 +237,7 @@ public sealed class VirtualMachine : IRootProvider
             break;
 
             // ===========================
-            // Логика
+            // Р›РѕРіРёРєР°
             // ===========================
             case OpCode.AND:
             {
@@ -264,7 +264,7 @@ public sealed class VirtualMachine : IRootProvider
             break;
 
             // ===========================
-            // Поток управления
+            // РџРѕС‚РѕРє СѓРїСЂР°РІР»РµРЅРёСЏ
             // ===========================
             case OpCode.JUMP:
                 _ip = Convert.ToInt32(instr.Operands[0]);
@@ -314,7 +314,7 @@ public sealed class VirtualMachine : IRootProvider
                 break;
 
             // ===========================
-            // Объекты (Память)
+            // РћР±СЉРµРєС‚С‹ (РџР°РјСЏС‚СЊ)
             // ===========================
             case OpCode.NEW_OBJECT:
             {
@@ -325,10 +325,10 @@ public sealed class VirtualMachine : IRootProvider
                     throw new InvalidOperationException($"Class ID {classId} not found");
                 }
 
-                // Размер данных: кол-во полей * 8 байт (Header обрабатывает RuntimeContext)
+                // Р Р°Р·РјРµСЂ РґР°РЅРЅС‹С…: РєРѕР»-РІРѕ РїРѕР»РµР№ * 8 Р±Р°Р№С‚ (Header РѕР±СЂР°Р±Р°С‚С‹РІР°РµС‚ RuntimeContext)
                 var payloadSize = cls.Fields.Count * 8;
 
-                // 1. Пробуем выделить. Если нет места -> GC.
+                // 1. РџСЂРѕР±СѓРµРј РІС‹РґРµР»РёС‚СЊ. Р•СЃР»Рё РЅРµС‚ РјРµСЃС‚Р° -> GC.
                 if (!_runtime.CanAllocate(payloadSize))
                 {
                     _runtime.Collect(this);
@@ -350,7 +350,7 @@ public sealed class VirtualMachine : IRootProvider
                 Value objRef = _evalStack.Pop();
                 CheckNull(objRef);
 
-                // Используем RuntimeContext для безопасного чтения (с учетом Header)
+                // РСЃРїРѕР»СЊР·СѓРµРј RuntimeContext РґР»СЏ Р±РµР·РѕРїР°СЃРЅРѕРіРѕ С‡С‚РµРЅРёСЏ (СЃ СѓС‡РµС‚РѕРј Header)
                 Value val = _runtime.ReadField(objRef.AsObject(), fieldIdx);
                 _evalStack.Push(val);
                 _ip++;
@@ -370,18 +370,18 @@ public sealed class VirtualMachine : IRootProvider
             break;
 
             // ===========================
-            // Массивы
+            // РњР°СЃСЃРёРІС‹
             // ===========================
             case OpCode.NEW_ARRAY:
             {
-                // [array_id] (тип массива) игнорируем для MVP аллокации, нам нужен размер со стека
+                // [array_id] (С‚РёРї РјР°СЃСЃРёРІР°) РёРіРЅРѕСЂРёСЂСѓРµРј РґР»СЏ MVP Р°Р»Р»РѕРєР°С†РёРё, РЅР°Рј РЅСѓР¶РµРЅ СЂР°Р·РјРµСЂ СЃРѕ СЃС‚РµРєР°
                 var length = _evalStack.Pop().AsInt();
                 if (length < 0)
                 {
                     throw new InvalidOperationException("Array size cannot be negative");
                 }
 
-                // Размер данных: длина * 8 байт
+                // Р Р°Р·РјРµСЂ РґР°РЅРЅС‹С…: РґР»РёРЅР° * 8 Р±Р°Р№С‚
                 var payloadSize = length * 8;
 
                 if (!_runtime.CanAllocate(payloadSize))
@@ -405,7 +405,7 @@ public sealed class VirtualMachine : IRootProvider
                 Value arrRef = _evalStack.Pop();
                 CheckNull(arrRef);
 
-                // Runtime сам проверит границы массива
+                // Runtime СЃР°Рј РїСЂРѕРІРµСЂРёС‚ РіСЂР°РЅРёС†С‹ РјР°СЃСЃРёРІР°
                 Value val = _runtime.ReadArrayElement(arrRef.AsObject(), index);
                 _evalStack.Push(val);
                 _ip++;

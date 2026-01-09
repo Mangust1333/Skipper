@@ -1,4 +1,4 @@
-using Skipper.Runtime.Objects;
+ï»¿using Skipper.Runtime.Objects;
 
 namespace Skipper.Runtime.Memory;
 
@@ -28,7 +28,7 @@ public sealed class Heap
             throw new OutOfMemoryException($"Not enough memory. Requested: {size}, Available: {_maxSize - AllocatedBytes}");
         }
 
-        // Âûäåëåíèå ïàìÿòè ïðîèñõîäèò âíóòðè HeapObject
+        // Ð’Ñ‹Ð´ÐµÐ»ÐµÐ½Ð¸Ðµ Ð¿Ð°Ð¼ÑÑ‚Ð¸ Ð¿Ñ€Ð¾Ð¸ÑÑ…Ð¾Ð´Ð¸Ñ‚ Ð²Ð½ÑƒÑ‚Ñ€Ð¸ HeapObject
         HeapObject obj = new(descriptor, size);
 
         _objects.Add(obj);
@@ -39,7 +39,7 @@ public sealed class Heap
 
     public unsafe HeapObject? FindObject(nint address)
     {
-        // Ïîèñê îáúåêòà, êîòîðîìó ïðèíàäëåæèò àäðåñ
+        // ÐŸÐ¾Ð¸ÑÐº Ð¾Ð±ÑŠÐµÐºÑ‚Ð°, ÐºÐ¾Ñ‚Ð¾Ñ€Ð¾Ð¼Ñƒ Ð¿Ñ€Ð¸Ð½Ð°Ð´Ð»ÐµÐ¶Ð¸Ñ‚ Ð°Ð´Ñ€ÐµÑ
         for (var i = _objects.Count - 1; i >= 0; i--)
         {
             HeapObject obj = _objects[i];

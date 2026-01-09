@@ -1,4 +1,4 @@
-namespace Skipper.Runtime.Values;
+﻿namespace Skipper.Runtime.Values;
 
 public enum ValueKind : byte
 {

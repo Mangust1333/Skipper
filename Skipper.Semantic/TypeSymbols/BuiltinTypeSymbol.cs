@@ -1,4 +1,4 @@
-namespace Skipper.Semantic.TypeSymbols;
+﻿namespace Skipper.Semantic.TypeSymbols;
 
 public sealed class BuiltinTypeSymbol : TypeSymbol
 {

@@ -1,4 +1,4 @@
-namespace Skipper.Runtime.Abstractions;
+﻿namespace Skipper.Runtime.Abstractions;
 
 public interface IGarbageCollector
 {

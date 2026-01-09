@@ -1,4 +1,4 @@
-using Xunit;
+п»їusing Xunit;
 
 namespace Skipper.Semantic.Tests;
 
@@ -426,10 +426,10 @@ public class SemanticTests
                             fn main() {
                                 int x = 1;
                                 {
-                                    bool x = true; // Это законно, новый скоуп
+                                    bool x = true; // Р­С‚Рѕ Р·Р°РєРѕРЅРЅРѕ, РЅРѕРІС‹Р№ СЃРєРѕСѓРї
                                     if (x) { }
                                 }
-                                int y = x + 1; // Здесь x снова int (1)
+                                int y = x + 1; // Р—РґРµСЃСЊ x СЃРЅРѕРІР° int (1)
                             }
                             """;
 
@@ -473,7 +473,7 @@ public class SemanticTests
                                 int width;
                                 
                                 fn setWidth(int w) {
-                                    width = w; // Должно найти поле width
+                                    width = w; // Р”РѕР»Р¶РЅРѕ РЅР°Р№С‚Рё РїРѕР»Рµ width
                                 }
                                 
                                 fn getWidth() -> int {
@@ -500,7 +500,7 @@ public class SemanticTests
                                 } else {
                                     return 0;
                                 }
-                                // Здесь return не нужен, так как if/else покрывают все ветки
+                                // Р—РґРµСЃСЊ return РЅРµ РЅСѓР¶РµРЅ, С‚Р°Рє РєР°Рє if/else РїРѕРєСЂС‹РІР°СЋС‚ РІСЃРµ РІРµС‚РєРё
                             }
                             """;
 
@@ -515,24 +515,24 @@ public class SemanticTests
     public void Scope_Hierarchy_Parameter_Hides_Global_And_Field()
     {
         // Arrange
-        // Логика MVP: Scope.Resolve (Локальные + Глобальные) имеет приоритет над полями класса.
-        // 1. В method1: аргумент 'val' перекрывает и глобальную 'val', и поле 'val'.
-        // 2. В method2: аргумента нет. Resolve находит глобальную 'val'. Поле класса игнорируется.
+        // Р›РѕРіРёРєР° MVP: Scope.Resolve (Р›РѕРєР°Р»СЊРЅС‹Рµ + Р“Р»РѕР±Р°Р»СЊРЅС‹Рµ) РёРјРµРµС‚ РїСЂРёРѕСЂРёС‚РµС‚ РЅР°Рґ РїРѕР»СЏРјРё РєР»Р°СЃСЃР°.
+        // 1. Р’ method1: Р°СЂРіСѓРјРµРЅС‚ 'val' РїРµСЂРµРєСЂС‹РІР°РµС‚ Рё РіР»РѕР±Р°Р»СЊРЅСѓСЋ 'val', Рё РїРѕР»Рµ 'val'.
+        // 2. Р’ method2: Р°СЂРіСѓРјРµРЅС‚Р° РЅРµС‚. Resolve РЅР°С…РѕРґРёС‚ РіР»РѕР±Р°Р»СЊРЅСѓСЋ 'val'. РџРѕР»Рµ РєР»Р°СЃСЃР° РёРіРЅРѕСЂРёСЂСѓРµС‚СЃСЏ.
         const string code = """
-                            int val = 100; // Глобальная
+                            int val = 100; // Р“Р»РѕР±Р°Р»СЊРЅР°СЏ
 
                             class Test {
-                                int val; // Поле (будет скрыто глобальной)
+                                int val; // РџРѕР»Рµ (Р±СѓРґРµС‚ СЃРєСЂС‹С‚Рѕ РіР»РѕР±Р°Р»СЊРЅРѕР№)
 
                                 fn method1(bool val) {
-                                    // Здесь val - это bool (аргумент)
+                                    // Р—РґРµСЃСЊ val - СЌС‚Рѕ bool (Р°СЂРіСѓРјРµРЅС‚)
                                     if (val) { } 
                                 }
 
                                 fn method2() {
-                                    // Здесь val - это int (глобальная), а не поле!
-                                    // Если бы это было поле, мы бы не смогли присвоить ей результат method1 (void/error)
-                                    // Но проверка типов пройдет, так как int (global) = int
+                                    // Р—РґРµСЃСЊ val - СЌС‚Рѕ int (РіР»РѕР±Р°Р»СЊРЅР°СЏ), Р° РЅРµ РїРѕР»Рµ!
+                                    // Р•СЃР»Рё Р±С‹ СЌС‚Рѕ Р±С‹Р»Рѕ РїРѕР»Рµ, РјС‹ Р±С‹ РЅРµ СЃРјРѕРіР»Рё РїСЂРёСЃРІРѕРёС‚СЊ РµР№ СЂРµР·СѓР»СЊС‚Р°С‚ method1 (void/error)
+                                    // РќРѕ РїСЂРѕРІРµСЂРєР° С‚РёРїРѕРІ РїСЂРѕР№РґРµС‚, С‚Р°Рє РєР°Рє int (global) = int
                                     int x = val; 
                                 }
                             }
@@ -556,7 +556,7 @@ public class SemanticTests
                                 {
                                     {
                                         while(true) {
-                                            // Должны видеть outer через 4 уровня скоупов
+                                            // Р”РѕР»Р¶РЅС‹ РІРёРґРµС‚СЊ outer С‡РµСЂРµР· 4 СѓСЂРѕРІРЅСЏ СЃРєРѕСѓРїРѕРІ
                                             outer = outer + 1;
                                             if (outer > 10) { return; }
                                         }
@@ -587,9 +587,9 @@ public class SemanticTests
                                 } else {
                                     return 0;
                                 }
-                                // Здесь все ветки else закрыты return-ом
+                                // Р—РґРµСЃСЊ РІСЃРµ РІРµС‚РєРё else Р·Р°РєСЂС‹С‚С‹ return-РѕРј
                             }
-                            // Сюда управление не дойдет, анализатор должен это понять
+                            // РЎСЋРґР° СѓРїСЂР°РІР»РµРЅРёРµ РЅРµ РґРѕР№РґРµС‚, Р°РЅР°Р»РёР·Р°С‚РѕСЂ РґРѕР»Р¶РµРЅ СЌС‚Рѕ РїРѕРЅСЏС‚СЊ
                         }
                         """;
 
@@ -604,14 +604,14 @@ public class SemanticTests
     public void ControlFlow_Return_Analysis_Missing_In_Loop()
     {
         // Arrange
-        // Анализатор консервативен: он не знает, выполнится ли while(true) хотя бы раз,
-        // поэтому считает, что выход из функции возможен без return.
+        // РђРЅР°Р»РёР·Р°С‚РѕСЂ РєРѕРЅСЃРµСЂРІР°С‚РёРІРµРЅ: РѕРЅ РЅРµ Р·РЅР°РµС‚, РІС‹РїРѕР»РЅРёС‚СЃСЏ Р»Рё while(true) С…РѕС‚СЏ Р±С‹ СЂР°Р·,
+        // РїРѕСЌС‚РѕРјСѓ СЃС‡РёС‚Р°РµС‚, С‡С‚Рѕ РІС‹С…РѕРґ РёР· С„СѓРЅРєС†РёРё РІРѕР·РјРѕР¶РµРЅ Р±РµР· return.
         const string code = """
                         fn loop() -> int {
                             while (true) {
                                 return 1;
                             }
-                            // Ошибка: а вдруг цикл не выполнится? (для статического анализатора)
+                            // РћС€РёР±РєР°: Р° РІРґСЂСѓРі С†РёРєР» РЅРµ РІС‹РїРѕР»РЅРёС‚СЃСЏ? (РґР»СЏ СЃС‚Р°С‚РёС‡РµСЃРєРѕРіРѕ Р°РЅР°Р»РёР·Р°С‚РѕСЂР°)
                         }
                         """;
 
@@ -665,12 +665,12 @@ public class SemanticTests
                         class Math {
                             fn isEven(int n) -> bool {
                                 if (n == 0) { return true; }
-                                return isOdd(n - 1); // isOdd объявлен ниже, но должен быть виден
+                                return isOdd(n - 1); // isOdd РѕР±СЉСЏРІР»РµРЅ РЅРёР¶Рµ, РЅРѕ РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ РІРёРґРµРЅ
                             }
                             
                             fn isOdd(int n) -> bool {
                                 if (n == 0) { return false; }
-                                return isEven(n - 1); // Рекурсия
+                                return isEven(n - 1); // Р РµРєСѓСЂСЃРёСЏ
                             }
                         }
                         """;
@@ -697,8 +697,8 @@ public class SemanticTests
                         
                         fn main() {
                             Shape s;
-                            // s.getCenter() возвращает Point
-                            // .x обращается к полю Point
+                            // s.getCenter() РІРѕР·РІСЂР°С‰Р°РµС‚ Point
+                            // .x РѕР±СЂР°С‰Р°РµС‚СЃСЏ Рє РїРѕР»СЋ Point
                             int val = s.getCenter().x; 
                         }
                         """;
@@ -717,7 +717,7 @@ public class SemanticTests
         const string code = """
                         class Node {
                             int value;
-                            Node next; // Поле типа самого класса
+                            Node next; // РџРѕР»Рµ С‚РёРїР° СЃР°РјРѕРіРѕ РєР»Р°СЃСЃР°
                         }
                         
                         fn main() {
@@ -771,7 +771,7 @@ public class SemanticTests
                             Point[] points;
                             points[0] = new Point();
                             
-                            // Доступ к массиву -> Доступ к полю
+                            // Р”РѕСЃС‚СѓРї Рє РјР°СЃСЃРёРІСѓ -> Р”РѕСЃС‚СѓРї Рє РїРѕР»СЋ
                             points[0].x = 10;
                             
                             int val = points[0].y;
@@ -792,7 +792,7 @@ public class SemanticTests
         const string code = """
                         fn main() {
                             for (int i = 0; i < 10; i = i + 1) {
-                                // Это должно быть законно (новый блок)
+                                // Р­С‚Рѕ РґРѕР»Р¶РЅРѕ Р±С‹С‚СЊ Р·Р°РєРѕРЅРЅРѕ (РЅРѕРІС‹Р№ Р±Р»РѕРє)
                                 int i = 5; 
                             }
                         }
@@ -810,7 +810,7 @@ public class SemanticTests
     {
         // Arrange
         const string code = """
-                        fn proc() { // void по умолчанию
+                        fn proc() { // void РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ
                             return 1;
                         }
                         """;
