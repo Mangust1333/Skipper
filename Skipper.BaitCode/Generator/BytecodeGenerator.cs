@@ -32,7 +32,6 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
     public BytecodeProgram Generate(ProgramNode program)
     {
         VisitProgram(program);
-
         return _program;
     }
 
@@ -92,7 +91,10 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
     // Объявление параметров функции
     public BytecodeGenerator VisitParameterDeclaration(ParameterDeclaration node)
     {
-        if (_currentFunction == null) throw new InvalidOperationException("Parameter outside function");
+        if (_currentFunction == null)
+        {
+            throw new InvalidOperationException("Parameter outside function");
+        }
 
         Locals.Declare(node.Name, ResolveType(node.TypeName));
         return this;
@@ -230,7 +232,10 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
     // Промежуточное создание байткода, пока что не известно, каким будет параметр
     private int EmitPlaceholder(OpCode opCode)
     {
-        if (_currentFunction == null) throw new NullReferenceException("No function declared in scope");
+        if (_currentFunction == null)
+        {
+            throw new NullReferenceException("No function declared in scope");
+        }
 
         var placeholderIndex = _currentFunction.Code.Count;
         Emit(opCode, 0); // 0 будет заменено позже
@@ -240,7 +245,10 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
     // Когда известен параметр для байткода, созданного EmitPlaceholder, этот параметр дополняется
     private void Patch(int instructionIndex)
     {
-        if (_currentFunction == null) throw new NullReferenceException("No function declared in scope");
+        if (_currentFunction == null)
+        {
+            throw new NullReferenceException("No function declared in scope");
+        }
 
         var instr = _currentFunction.Code[instructionIndex];
         _currentFunction.Code[instructionIndex] = new Instruction(instr.OpCode, _currentFunction.Code.Count);
@@ -439,8 +447,7 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
             }
 
             default:
-                throw new InvalidOperationException(
-                    $"Expression '{target.NodeType}' cannot be assigned to");
+                throw new InvalidOperationException($"Expression '{target.NodeType}' cannot be assigned to");
         }
     }
 
@@ -551,7 +558,7 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         node.Condition.Accept(this);
         var jumpFalse = EmitPlaceholder(OpCode.JUMP_IF_FALSE);
 
-        node.Condition.Accept(this);
+        node.ThenBranch.Accept(this);
         var jumpEnd = EmitPlaceholder(OpCode.JUMP);
 
         Patch(jumpFalse);
@@ -690,18 +697,21 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
         var bytecodeClass = ResolveClass(node);
 
         // Получаем поле
-        return !bytecodeClass.Fields.TryGetValue(node.MemberName, out var field)
-            ? throw new InvalidOperationException(
-                $"Field '{node.MemberName}' not found in class '{bytecodeClass.Name}'")
-            : (bytecodeClass.ClassId, field.FieldId);
+        if (!bytecodeClass.Fields.TryGetValue(node.MemberName, out var field))
+        {
+            throw new InvalidOperationException($"Field '{node.MemberName}' not found in class '{bytecodeClass.Name}'");
+        }
+
+        return (bytecodeClass.ClassId, field.FieldId);
     }
 
     // Возвращает класс, поле которого, мы хотим получить
     private BytecodeClass ResolveClass(MemberAccessExpression node)
     {
         if (node.Object is not IdentifierExpression id)
-            throw new InvalidOperationException(
-                "MemberAccessExpression.Object must be IdentifierExpression");
+        {
+            throw new InvalidOperationException("MemberAccessExpression.Object must be IdentifierExpression");
+        }
 
         // 1. Находим переменную
         BytecodeVariable? variable;
@@ -718,7 +728,9 @@ public class BytecodeGenerator : IAstVisitor<BytecodeGenerator>
 
         // 2. Проверяем, что это класс
         if (variable.Type is not ClassType classType)
+        {
             throw new InvalidOperationException($"Member access on non-class variable '{id.Name}'");
+        }
 
         // 3. Получаем класс
         var cls = _program.Classes.First(c => c.ClassId == classType.ClassId);

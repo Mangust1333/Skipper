@@ -25,7 +25,9 @@ public sealed class LocalSlotManager(BytecodeFunction function)
         var scope = _scopes.Peek();
 
         if (scope.ContainsKey(name))
+        {
             throw new InvalidOperationException($"Variable '{name}' already declared in this scope");
+        }
 
         var slot = function.Locals.Count;
 
@@ -40,8 +42,12 @@ public sealed class LocalSlotManager(BytecodeFunction function)
     public bool TryResolve(string name, out int slot)
     {
         foreach (var scope in _scopes)
+        {
             if (scope.TryGetValue(name, out slot))
+            {
                 return true;
+            }
+        }
 
         slot = -1;
         return false;

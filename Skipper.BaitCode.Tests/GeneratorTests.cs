@@ -306,6 +306,46 @@ public class GeneratorTests
 
         Assert.Contains(inst, i => i.OpCode == OpCode.CALL_METHOD);
     }
+    
+    [Fact]
+    public void ControlFlow_TernaryOperator_GeneratesCorrectJumps()
+    {
+        const string code = """
+                            fn main() {
+                                return true ? 1 : 0;
+                            }
+                            """;
+
+        var inst = GetInstructions(Generate(code), "main");
+
+        /*
+         * PUSH true
+         * JUMP_IF_FALSE else
+         * PUSH 1
+         * JUMP end
+         * else:
+         * PUSH 0
+         * end:
+         * RETURN
+         */
+
+        Assert.Contains(inst, i => i.OpCode == OpCode.JUMP_IF_FALSE);
+        Assert.Contains(inst, i => i.OpCode == OpCode.JUMP);
+
+        var jif = inst.First(i => i.OpCode == OpCode.JUMP_IF_FALSE);
+        var jmp = inst.First(i => i.OpCode == OpCode.JUMP);
+
+        var jifIndex = inst.IndexOf(jif);
+        var jmpIndex = inst.IndexOf(jmp);
+
+        Assert.True(jifIndex < jmpIndex, "JUMP_IF_FALSE must occur before JUMP");
+
+        var elseTarget = (int)jif.Operands[0];
+        var endTarget  = (int)jmp.Operands[0];
+
+        Assert.True(elseTarget > jifIndex, "Else target must be forward");
+        Assert.True(endTarget > elseTarget, "End target must be after else");
+    }
 
     private static BytecodeProgram Generate(string source)
     {
